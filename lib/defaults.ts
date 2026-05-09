@@ -35,6 +35,7 @@ export const defaultSettings: Settings = {
   phone: '',
   currencySymbol: '$',
   taxYear: 'calendar',
+  taxMode: 'flat',
   taxRate: 0,
   incomeCategories: DEFAULT_INCOME_CATEGORIES,
   costCategories: DEFAULT_COST_CATEGORIES,
@@ -45,4 +46,5 @@ export const STORAGE_KEYS = {
   transactions: 'accounts.transactions',
   clients: 'accounts.clients',
   invoices: 'accounts.invoices',
+  onboardingDone: 'accounts.onboardingDone',
 } as const;

@@ -35,6 +35,8 @@ export type TrackedInvoice = {
   notes: string;
 };
 
+export type TaxMode = 'flat' | 'uk-sole-trader';
+
 export type Settings = {
   businessName: string;
   businessAddress: string;
@@ -42,9 +44,31 @@ export type Settings = {
   phone: string;
   currencySymbol: string;
   taxYear: 'calendar' | 'apr-mar' | 'jul-jun' | 'oct-sep';
+  taxMode: TaxMode;
   taxRate: number;
   incomeCategories: string[];
   costCategories: string[];
+};
+
+export type TaxBandResult = {
+  name: string;
+  from: number;
+  to: number | null;
+  rate: number;
+  taxableAmount: number;
+  tax: number;
+};
+
+export type TaxBreakdown = {
+  grossProfit: number;
+  incomeTaxBands: TaxBandResult[];
+  incomeTax: number;
+  class2NI: number;
+  class4NIBands: TaxBandResult[];
+  class4NI: number;
+  totalNI: number;
+  totalTax: number;
+  afterTax: number;
 };
 
 export type DateRange = {

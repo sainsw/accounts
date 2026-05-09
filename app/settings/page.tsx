@@ -109,10 +109,25 @@ export default function SettingsPage() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Estimated Tax Rate (%)</span>
-              <input type="number" min="0" max="100" step="0.5" value={settings.taxRate} onChange={(e) => { set('taxRate', parseFloat(e.target.value) || 0); flash(); }}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Tax Calculation</span>
+              <select value={settings.taxMode} onChange={(e) => { set('taxMode', e.target.value as Settings['taxMode']); flash(); }}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                <option value="flat">Flat Rate</option>
+                <option value="uk-sole-trader">UK Sole Trader (Income Tax + NI)</option>
+              </select>
             </label>
+            {settings.taxMode === 'flat' && (
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Estimated Tax Rate (%)</span>
+                <input type="number" min="0" max="100" step="0.5" value={settings.taxRate} onChange={(e) => { set('taxRate', parseFloat(e.target.value) || 0); flash(); }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+              </label>
+            )}
+            {settings.taxMode === 'uk-sole-trader' && (
+              <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-500/10 dark:text-blue-300">
+                UK Income Tax bands, Class 2 and Class 4 National Insurance will be calculated automatically based on your net profit. Rates are based on the 2024/25 tax year.
+              </div>
+            )}
           </div>
         </Card>
 

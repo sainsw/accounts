@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, PageHeader, StatCard } from '@/components/Card';
 import { formatCurrency, formatMonth, getYearRange, isInRange } from '@/lib/utils';
+import { calculateUKTax, calculateFlatTax } from '@/lib/tax';
+import type { TaxBandResult } from '@/lib/types';
 
 export default function ReportsPage() {
   const { ready, settings, transactions } = useApp();
@@ -22,9 +24,11 @@ export default function ReportsPage() {
     const income = yearTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const costs = yearTx.filter((t) => t.type === 'cost').reduce((s, t) => s + t.amount, 0);
     const net = income - costs;
-    const estimatedTax = settings.taxRate > 0 ? net * (settings.taxRate / 100) : 0;
-    return { income, costs, net, estimatedTax, afterTax: net - estimatedTax };
-  }, [yearTx, settings.taxRate]);
+    const tax = settings.taxMode === 'uk-sole-trader'
+      ? calculateUKTax(net)
+      : calculateFlatTax(net, settings.taxRate);
+    return { income, costs, net, tax };
+  }, [yearTx, settings.taxRate, settings.taxMode]);
 
   const incomeByCategory = useMemo(() => {
     const map: Record<string, number> = {};
@@ -80,9 +84,43 @@ export default function ReportsPage() {
         <StatCard label="Total Income" value={formatCurrency(pnl.income, sym)} color="green" />
         <StatCard label="Total Costs" value={formatCurrency(pnl.costs, sym)} color="red" />
         <StatCard label="Net Profit" value={formatCurrency(pnl.net, sym)} color={pnl.net >= 0 ? 'green' : 'red'} />
-        <StatCard label={`Est. Tax (${settings.taxRate}%)`} value={formatCurrency(pnl.estimatedTax, sym)} color="red" />
-        <StatCard label="After Tax" value={formatCurrency(pnl.afterTax, sym)} color={pnl.afterTax >= 0 ? 'green' : 'red'} />
+        <StatCard label="Est. Tax" value={formatCurrency(pnl.tax.totalTax, sym)} color="red" />
+        <StatCard label="After Tax" value={formatCurrency(pnl.tax.afterTax, sym)} color={pnl.tax.afterTax >= 0 ? 'green' : 'red'} />
       </div>
+
+      {/* Tax Breakdown */}
+      <Card className="mb-6">
+        <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">
+          Tax Breakdown
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            {settings.taxMode === 'uk-sole-trader' ? 'UK Sole Trader (2024/25)' : `Flat rate ${settings.taxRate}%`}
+          </span>
+        </h2>
+        {pnl.net <= 0 ? (
+          <p className="text-sm text-slate-500">No taxable profit this period</p>
+        ) : (
+          <div className="space-y-4">
+            <TaxBandsTable title="Income Tax" bands={pnl.tax.incomeTaxBands} total={pnl.tax.incomeTax} sym={sym} />
+            {settings.taxMode === 'uk-sole-trader' && (
+              <>
+                <TaxBandsTable title="Class 4 National Insurance" bands={pnl.tax.class4NIBands} total={pnl.tax.class4NI} sym={sym} />
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700">
+                  <span className="text-slate-600 dark:text-slate-400">Class 2 National Insurance <span className="text-xs text-slate-400">(flat weekly rate)</span></span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100">{formatCurrency(pnl.tax.class2NI, sym)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800">
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Total Tax & NI</span>
+              <span className="text-sm font-bold text-red-600 dark:text-red-400">{formatCurrency(pnl.tax.totalTax, sym)}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Take-Home Profit</span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(pnl.tax.afterTax, sym)}</span>
+            </div>
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Income by Category */}
@@ -177,5 +215,44 @@ export default function ReportsPage() {
         )}
       </Card>
     </>
+  );
+}
+
+function TaxBandsTable({ title, bands, total, sym }: { title: string; bands: TaxBandResult[]; total: number; sym: string }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">{title}</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs font-medium text-slate-500 dark:border-slate-700">
+              <th className="pb-1.5">Band</th>
+              <th className="pb-1.5 text-right">Rate</th>
+              <th className="pb-1.5 text-right">Taxable</th>
+              <th className="pb-1.5 text-right">Tax</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
+            {bands.map((band) => (
+              <tr key={band.name}>
+                <td className="py-1.5 text-slate-600 dark:text-slate-400">
+                  {band.name}
+                  <span className="ml-1 text-slate-400 dark:text-slate-500">
+                    ({formatCurrency(band.from, sym)} – {band.to !== null ? formatCurrency(band.to, sym) : '∞'})
+                  </span>
+                </td>
+                <td className="py-1.5 text-right text-slate-600 dark:text-slate-400">{(band.rate * 100).toFixed(0)}%</td>
+                <td className="py-1.5 text-right text-slate-600 dark:text-slate-400">{formatCurrency(band.taxableAmount, sym)}</td>
+                <td className="py-1.5 text-right font-medium text-slate-900 dark:text-slate-100">{formatCurrency(band.tax, sym)}</td>
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td colSpan={3} className="pt-2 text-slate-900 dark:text-slate-100">Total {title}</td>
+              <td className="pt-2 text-right text-red-600 dark:text-red-400">{formatCurrency(total, sym)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

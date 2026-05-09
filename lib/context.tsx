@@ -19,6 +19,8 @@ import { generateId, todayString } from './utils';
 
 type AppContextValue = {
   ready: boolean;
+  onboardingDone: boolean;
+  completeOnboarding: () => void;
   settings: Settings;
   updateSettings: (s: Settings) => void;
 
@@ -51,9 +53,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const txState = usePersistentState<Transaction[]>(STORAGE_KEYS.transactions, () => []);
   const clientState = usePersistentState<Client[]>(STORAGE_KEYS.clients, () => []);
   const invoiceState = usePersistentState<TrackedInvoice[]>(STORAGE_KEYS.invoices, () => []);
+  const onboardingState = usePersistentState<boolean>(STORAGE_KEYS.onboardingDone, () => false);
 
   const ready =
-    settingsState.ready && txState.ready && clientState.ready && invoiceState.ready;
+    settingsState.ready && txState.ready && clientState.ready && invoiceState.ready && onboardingState.ready;
+
+  const completeOnboarding = useCallback(() => {
+    onboardingState.setValue(true);
+  }, [onboardingState]);
 
   const addTransaction = useCallback(
     (t: Omit<Transaction, 'id'>) => {
@@ -124,6 +131,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     (): AppContextValue => ({
       ready,
+      onboardingDone: onboardingState.value,
+      completeOnboarding,
       settings,
       updateSettings: settingsState.setValue,
       transactions: txState.value,
@@ -141,6 +150,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready,
+      onboardingState.value,
+      completeOnboarding,
       settings,
       settingsState.setValue,
       txState.value,

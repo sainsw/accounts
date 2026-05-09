@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import Nav from '@/components/Nav';
+import OnboardingGate from '@/components/OnboardingGate';
 import { AppProvider } from '@/lib/context';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="flex h-full font-sans">
         <AppProvider>
+          <OnboardingGate />
           <aside className="sticky top-0 flex h-screen w-16 shrink-0 flex-col border-r border-slate-200 bg-white px-2 py-4 dark:border-slate-700/60 dark:bg-slate-900 lg:w-56 lg:px-3">
             <div className="mb-6 flex items-center gap-2 px-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white">
