@@ -109,23 +109,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addInvoice = useCallback(
     (i: Omit<TrackedInvoice, 'id'>) => {
-      invoiceState.setValue((prev) => [{ ...i, id: generateId() }, ...prev]);
+      const invoiceId = generateId();
+      invoiceState.setValue((prev) => [{ ...i, id: invoiceId }, ...prev]);
+
+      if (i.status === 'paid') {
+        const tx: Transaction = {
+          id: generateId(),
+          date: i.paidDate || todayString(),
+          type: 'income',
+          amount: i.amount,
+          description: `Invoice ${i.invoiceNumber} — ${i.clientName}`,
+          category: 'Consulting',
+          clientId: i.clientId,
+          invoiceId,
+          notes: '',
+        };
+        txState.setValue((prev) => [tx, ...prev]);
+      }
     },
-    [invoiceState]
+    [invoiceState, txState]
   );
 
   const updateInvoice = useCallback(
     (i: TrackedInvoice) => {
       invoiceState.setValue((prev) => prev.map((x) => (x.id === i.id ? i : x)));
+
+      if (i.status === 'paid') {
+        // Create income transaction if one doesn't already exist for this invoice
+        txState.setValue((prev) => {
+          const exists = prev.some((t) => t.invoiceId === i.id);
+          if (exists) return prev;
+          const tx: Transaction = {
+            id: generateId(),
+            date: i.paidDate || todayString(),
+            type: 'income',
+            amount: i.amount,
+            description: `Invoice ${i.invoiceNumber} — ${i.clientName}`,
+            category: 'Consulting',
+            clientId: i.clientId,
+            invoiceId: i.id,
+            notes: '',
+          };
+          return [tx, ...prev];
+        });
+      } else {
+        // If status changed away from paid, remove the auto-created transaction
+        txState.setValue((prev) => prev.filter((t) => t.invoiceId !== i.id));
+      }
     },
-    [invoiceState]
+    [invoiceState, txState]
   );
 
   const deleteInvoice = useCallback(
     (id: string) => {
       invoiceState.setValue((prev) => prev.filter((x) => x.id !== id));
+      // Remove any auto-created transaction linked to this invoice
+      txState.setValue((prev) => prev.filter((t) => t.invoiceId !== id));
     },
-    [invoiceState]
+    [invoiceState, txState]
   );
 
   const value = useMemo(
