@@ -279,7 +279,13 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</span>
-              <select value={form.status} onChange={(e) => updateForm('status', e.target.value as TrackedInvoice['status'])}
+              <select value={form.status} onChange={(e) => {
+                const newStatus = e.target.value as TrackedInvoice['status'];
+                updateForm('status', newStatus);
+                if (newStatus === 'paid' && !form.paidDate) {
+                  updateForm('paidDate', form.dueDate || form.issueDate || todayString());
+                }
+              }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                 <option value="draft">Draft</option>
                 <option value="sent">Sent</option>
@@ -288,6 +294,15 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
               </select>
             </label>
           </div>
+
+          {form.status === 'paid' && (
+            <label className="block">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
+              <span className="ml-1 text-[10px] text-slate-400">(used for tax year)</span>
+              <input type="date" value={form.paidDate || ''} onChange={(e) => updateForm('paidDate', e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+            </label>
+          )}
         </div>
 
         {/* Actions */}
