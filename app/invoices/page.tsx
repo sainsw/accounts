@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
@@ -36,10 +37,48 @@ const STATUS_COLORS: Record<TrackedInvoice['status'], string> = {
 };
 
 export default function InvoicesPage() {
+  return (
+    <Suspense>
+      <InvoicesContent />
+    </Suspense>
+  );
+}
+
+function InvoicesContent() {
   const { ready, settings, invoices, clients, addInvoice, updateInvoice, deleteInvoice } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TrackedInvoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<'' | TrackedInvoice['status']>('');
+  const [importData, setImportData] = useState<FormData | null>(null);
+  const searchParams = useSearchParams();
+
+  // Handle ?import= param from invoicer
+  useEffect(() => {
+    if (!ready) return;
+    const raw = searchParams.get('import');
+    if (!raw) return;
+    try {
+      const data = JSON.parse(atob(raw));
+      const prefilled: FormData = {
+        invoiceNumber: data.invoiceNumber || '',
+        clientId: clients.find((c) => c.name === data.clientName)?.id ?? null,
+        clientName: data.clientName || '',
+        issueDate: data.issueDate || todayString(),
+        dueDate: data.dueDate || '',
+        amount: data.amount || 0,
+        status: data.status || 'sent',
+        paidDate: null,
+        notes: '',
+      };
+      setImportData(prefilled);
+      setEditing(null);
+      setModalOpen(true);
+      // Clean the URL without reloading
+      window.history.replaceState({}, '', '/invoices');
+    } catch {
+      // Invalid import data, ignore
+    }
+  }, [ready, searchParams, clients]);
 
   const filtered = useMemo(() => {
     let list = [...invoices].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
@@ -160,11 +199,13 @@ export default function InvoicesPage() {
 
       <InvoiceModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setImportData(null); }}
         editing={editing}
+        importData={importData}
         clients={clients}
         sym={sym}
         onSave={(data) => {
+          setImportData(null);
           if (editing) updateInvoice({ ...data, id: editing.id });
           else addInvoice(data);
           setModalOpen(false);
@@ -178,6 +219,7 @@ function InvoiceModal({
   open,
   onClose,
   editing,
+  importData,
   clients,
   sym,
   onSave,
@@ -185,6 +227,7 @@ function InvoiceModal({
   open: boolean;
   onClose: () => void;
   editing: TrackedInvoice | null;
+  importData: FormData | null;
   clients: { id: string; name: string }[];
   sym: string;
   onSave: (data: FormData) => void;
@@ -193,14 +236,16 @@ function InvoiceModal({
 
   useMemo(() => {
     if (open) {
-      if (editing) {
+      if (importData) {
+        setForm(importData);
+      } else if (editing) {
         const { id: _, ...rest } = editing;
         setForm(rest);
       } else {
         setForm(emptyForm());
       }
     }
-  }, [open, editing]);
+  }, [open, editing, importData]);
 
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -212,7 +257,7 @@ function InvoiceModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit Invoice' : 'Track Invoice'}>
+    <Modal open={open} onClose={onClose} title={importData ? 'Import from Invoicer' : editing ? 'Edit Invoice' : 'Track Invoice'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
