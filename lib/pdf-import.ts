@@ -1,7 +1,6 @@
-// Use legacy build for broad browser compat + self-hosted legacy worker in public/
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export type ParsedInvoice = {
   fileName: string;
@@ -17,20 +16,26 @@ export type ParsedInvoice = {
  */
 async function extractLines(file: File): Promise<string[]> {
   const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const pdf = await getDocument({ data: buffer }).promise;
+  console.log('[pdf-import] loaded PDF, pages:', pdf.numPages);
   const allLines: string[] = [];
 
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
 
+    console.log(`[pdf-import] page ${p} raw items:`, content.items.length);
+
     // Filter to items with actual text content
     const items: Array<{ str: string; transform: number[] }> = [];
-    for (const item of content.items) {
-      if ('str' in item && typeof item.str === 'string' && item.str.trim().length > 0) {
-        items.push(item as { str: string; transform: number[] });
+    for (let idx = 0; idx < content.items.length; idx++) {
+      const item = content.items[idx];
+      if (item && 'str' in item && typeof (item as any).str === 'string' && (item as any).str.trim().length > 0) {
+        items.push({ str: (item as any).str, transform: (item as any).transform });
       }
     }
+
+    console.log(`[pdf-import] page ${p} text items after filter:`, items.length);
 
     // Sort by Y descending (top of page first), then X ascending
     items.sort((a, b) => {
@@ -41,7 +46,8 @@ async function extractLines(file: File): Promise<string[]> {
 
     let currentY = -1;
     let currentLine = '';
-    for (const item of items) {
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       const y = Math.round(item.transform[5]);
       if (currentY === -1 || Math.abs(y - currentY) > 5) {
         if (currentLine.trim()) allLines.push(currentLine.trim());
@@ -133,10 +139,13 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
   try {
     lines = await extractLines(file);
   } catch (e) {
-    console.warn('PDF text extraction failed for', file.name, e);
+    console.warn('[pdf-import] extraction FAILED for', file.name, e);
     result.invoiceNumber = invoiceNumberFromFilename(file.name);
     return result;
   }
+
+  console.log(`[pdf-import] ${file.name} — ${lines.length} lines extracted:`);
+  lines.forEach((l, i) => console.log(`  [${i}] ${l}`));
 
   if (lines.length === 0) {
     result.invoiceNumber = invoiceNumberFromFilename(file.name);
@@ -152,8 +161,7 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
     if (!result.invoiceNumber) {
       const m = /Invoice\s*#\s*:\s*(.+)/i.exec(line);
       if (m) {
-        // Take the first token after the label, strip trailing merged content
-        let val = m[1].trim().replace(/\s{2,}.*$/, '');
+        const val = m[1].trim().replace(/\s{2,}.*$/, '');
         if (val && val !== '—' && val !== '-') {
           result.invoiceNumber = val;
           fieldsFound++;
@@ -165,8 +173,7 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
     if (!result.issueDate) {
       const m = /Invoice\s*date\s*:\s*(.+)/i.exec(line);
       if (m) {
-        // The date value may be followed by other merged text
-        let raw = m[1].trim().replace(/\s{2,}.*$/, '');
+        const raw = m[1].trim().replace(/\s{2,}.*$/, '');
         const parsed = parseDate(raw);
         if (parsed) {
           result.issueDate = parsed;
@@ -180,14 +187,9 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
       for (let j = i + 1; j < lines.length && j <= i + 5; j++) {
         const next = lines[j]?.trim();
         if (!next) continue;
-        // Skip table headers, work rows (start with date-like patterns), and known labels
         if (TABLE_HEADER_PATTERN.test(next)) continue;
-        // Skip lines that look like work item rows (contain currency amounts mid-line)
         if (/\d{4}\s+[£$€]/.test(next)) continue;
-        // Skip lines that look like "Work  Nov 01, 2025  ..."
         if (/^Work\b/i.test(next)) continue;
-        // This looks like a client name
-        // If it contains double-spaces, take only the first segment (left column)
         const clientPart = next.split(/\s{2,}/)[0];
         if (clientPart && clientPart.length > 1) {
           result.clientName = clientPart;
@@ -215,6 +217,7 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
   if (fieldsFound >= 3) result.confidence = 'high';
   else if (fieldsFound >= 1) result.confidence = 'medium';
 
+  console.log(`[pdf-import] ${file.name} result:`, result);
   return result;
 }
 
