@@ -1,7 +1,9 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Use a self-hosted worker copied to public/ to avoid CDN version mismatches
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// Disable worker — runs on main thread, avoids all worker loading issues.
+// Fine for the small number of PDFs we process at a time.
+// @ts-expect-error — pdfjs types only allow string, but false disables the worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = false;
 
 export type ParsedInvoice = {
   fileName: string;
