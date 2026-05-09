@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #4f46e5;
+  --color-brand-600: #4338ca;
+  --color-brand-700: #3730a3;
+  --color-income: #059669;
+  --color-cost: #dc2626;
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
+
+body {
+  background: #f7f7fb;
+  @apply text-slate-900 antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0b1020;
+    @apply text-slate-100;
+  }
+}
+
+::selection {
+  @apply bg-brand-500 text-white;
+}
+
+input[type='date'],
+input[type='month'] {
+  min-width: 0;
+}
+
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
