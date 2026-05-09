@@ -7,6 +7,9 @@ import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import type { TrackedInvoice } from '@/lib/types';
+import dynamic from 'next/dynamic';
+
+const PdfImportWizard = dynamic(() => import('@/components/PdfImportWizard'), { ssr: false });
 
 type FormData = Omit<TrackedInvoice, 'id'>;
 
@@ -49,6 +52,7 @@ function InvoicesContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TrackedInvoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<'' | TrackedInvoice['status']>('');
+  const [showImporter, setShowImporter] = useState(false);
   const [importData, setImportData] = useState<FormData | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -113,7 +117,14 @@ function InvoicesContent() {
       <PageHeader
         title="Invoices"
         description="Track and manage your invoices"
-        actions={<Button onClick={openNew}><PlusIcon /> New Invoice</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowImporter((v) => !v)}>
+              <UploadIcon /> Import PDFs
+            </Button>
+            <Button onClick={openNew}><PlusIcon /> New Invoice</Button>
+          </div>
+        }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -122,6 +133,19 @@ function InvoicesContent() {
         <StatCard label="Outstanding" value={formatCurrency(stats.outstanding, sym)} color="blue" />
         <StatCard label="Overdue" value={formatCurrency(stats.overdue, sym)} color="red" />
       </div>
+
+      {showImporter && (
+        <div className="mb-6">
+          <PdfImportWizard
+            clients={clients}
+            existingInvoiceNumbers={invoices.map((i) => i.invoiceNumber)}
+            onComplete={(imported) => {
+              for (const inv of imported) addInvoice(inv);
+              setShowImporter(false);
+            }}
+          />
+        </div>
+      )}
 
       <div className="mb-4 flex gap-2">
         {(['', 'draft', 'sent', 'paid', 'overdue'] as const).map((s) => (
@@ -346,6 +370,14 @@ function InvoiceModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+    </svg>
   );
 }
 
