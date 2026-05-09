@@ -1,9 +1,7 @@
+// Use legacy build for broad browser compat + self-hosted legacy worker in public/
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Disable worker — runs on main thread, avoids all worker loading issues.
-// Fine for the small number of PDFs we process at a time.
-// @ts-expect-error — pdfjs types only allow string, but false disables the worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export type ParsedInvoice = {
   fileName: string;
