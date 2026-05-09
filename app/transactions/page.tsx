@@ -286,7 +286,7 @@ function TransactionModal({
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Date</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
             <input
               type="date"
               value={form.date}
@@ -295,7 +295,7 @@ function TransactionModal({
             />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Amount ({settings.currencySymbol})</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({settings.currencySymbol})</span>
             <input
               type="number"
               step="0.01"
@@ -309,7 +309,7 @@ function TransactionModal({
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Description</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
           <input
             type="text"
             value={form.description}
@@ -321,7 +321,7 @@ function TransactionModal({
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Category</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</span>
             <select
               value={form.category}
               onChange={(e) => set('category', e.target.value)}
@@ -334,7 +334,7 @@ function TransactionModal({
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Client</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
             <select
               value={form.clientId ?? ''}
               onChange={(e) => set('clientId', e.target.value || null)}
@@ -349,7 +349,7 @@ function TransactionModal({
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Notes</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
           <textarea
             value={form.notes}
             onChange={(e) => set('notes', e.target.value)}
@@ -359,11 +359,15 @@ function TransactionModal({
           />
         </label>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!form.description || !form.amount || !form.category}>
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <button onClick={onClose} type="button"
+            className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            Cancel
+          </button>
+          <button type="submit" disabled={!form.description || !form.amount || !form.category}
+            className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-50">
             {editing ? 'Save Changes' : 'Add Transaction'}
-          </Button>
+          </button>
         </div>
       </form>
     </Modal>

@@ -261,20 +261,20 @@ function InvoiceModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Invoice # *</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice # *</span>
             <input type="text" value={form.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
               placeholder="INV-001" />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Amount ({sym}) *</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({sym}) *</span>
             <input type="number" step="0.01" min="0" value={form.amount || ''} onChange={(e) => set('amount', parseFloat(e.target.value) || 0)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Client *</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client *</span>
           <div className="mt-1 flex gap-2">
             <select
               value={form.clientId ?? ''}
@@ -283,33 +283,33 @@ function InvoiceModal({
                 set('clientId', c?.id ?? null);
                 if (c) set('clientName', c.name);
               }}
-              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600"
+              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
             >
               <option value="">Select or type name</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input type="text" value={form.clientName} onChange={(e) => set('clientName', e.target.value)} placeholder="Client name"
-              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </div>
         </label>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
             <input type="date" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Due Date</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due Date</span>
             <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
           <select value={form.status} onChange={(e) => set('status', e.target.value as TrackedInvoice['status'])}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600">
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
@@ -319,23 +319,27 @@ function InvoiceModal({
 
         {form.status === 'paid' && (
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
             <input type="date" value={form.paidDate ?? ''} onChange={(e) => set('paidDate', e.target.value || null)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
         )}
 
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Notes</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
           <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
         </label>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!form.invoiceNumber || !form.clientName || !form.amount}>
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <button onClick={onClose} type="button"
+            className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            Cancel
+          </button>
+          <button type="submit" disabled={!form.invoiceNumber || !form.clientName || !form.amount}
+            className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-50">
             {editing ? 'Save Changes' : 'Track Invoice'}
-          </Button>
+          </button>
         </div>
       </form>
     </Modal>

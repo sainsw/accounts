@@ -180,36 +180,42 @@ function ClientModal({
     <Modal open={open} onClose={onClose} title={editing ? 'Edit Client' : 'New Client'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Name *</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Name *</span>
           <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
             placeholder="Client or company name" />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
             <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Phone</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone</span>
             <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
         </div>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Address</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Address</span>
           <textarea value={form.address} onChange={(e) => set('address', e.target.value)} rows={2}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Notes</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
           <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
         </label>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!form.name}>{editing ? 'Save Changes' : 'Add Client'}</Button>
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <button onClick={onClose} type="button"
+            className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            Cancel
+          </button>
+          <button type="submit" disabled={!form.name}
+            className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-50">
+            {editing ? 'Save Changes' : 'Add Client'}
+          </button>
         </div>
       </form>
     </Modal>
