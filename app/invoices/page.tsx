@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
@@ -51,12 +51,15 @@ function InvoicesContent() {
   const [statusFilter, setStatusFilter] = useState<'' | TrackedInvoice['status']>('');
   const [importData, setImportData] = useState<FormData | null>(null);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const importProcessed = useRef(false);
 
-  // Handle ?import= param from invoicer
+  // Handle ?import= param from invoicer (once only)
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || importProcessed.current) return;
     const raw = searchParams.get('import');
     if (!raw) return;
+    importProcessed.current = true;
     try {
       const data = JSON.parse(atob(raw));
       const prefilled: FormData = {
@@ -73,12 +76,12 @@ function InvoicesContent() {
       setImportData(prefilled);
       setEditing(null);
       setModalOpen(true);
-      // Clean the URL without reloading
-      window.history.replaceState({}, '', '/invoices');
+      // Clean the URL via the router so Next.js updates its internal state
+      router.replace('/invoices');
     } catch {
       // Invalid import data, ignore
     }
-  }, [ready, searchParams, clients]);
+  }, [ready, searchParams, clients, router]);
 
   const filtered = useMemo(() => {
     let list = [...invoices].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
