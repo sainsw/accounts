@@ -106,9 +106,8 @@ function InvoicesContent() {
   const openNew = useCallback(() => { setEditing(null); setModalOpen(true); }, []);
   const openEdit = useCallback((i: TrackedInvoice) => { setEditing(i); setModalOpen(true); }, []);
 
-  const markPaid = useCallback((inv: TrackedInvoice) => {
-    updateInvoice({ ...inv, status: 'paid', paidDate: todayString() });
-  }, [updateInvoice]);
+  const [markPaidInvoice, setMarkPaidInvoice] = useState<TrackedInvoice | null>(null);
+  const [markPaidDate, setMarkPaidDate] = useState(todayString());
 
   if (!ready) return null;
 
@@ -202,7 +201,11 @@ function InvoicesContent() {
                       <div className="flex gap-1">
                         {(inv.status === 'sent' || inv.status === 'overdue') && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); markPaid(inv); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMarkPaidDate(inv.dueDate || inv.issueDate || todayString());
+                              setMarkPaidInvoice(inv);
+                            }}
                             className="rounded px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
                           >
                             Mark Paid
@@ -223,6 +226,39 @@ function InvoicesContent() {
           </div>
         </Card>
       )}
+
+      {/* Mark as Paid modal */}
+      <Modal open={!!markPaidInvoice} onClose={() => setMarkPaidInvoice(null)} title="Mark as Paid">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Invoice <span className="font-medium text-slate-900 dark:text-slate-100">#{markPaidInvoice?.invoiceNumber}</span> — {formatCurrency(markPaidInvoice?.amount ?? 0, sym)}
+          </p>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
+            <span className="ml-1 text-xs text-slate-400">(used for tax year)</span>
+            <input type="date" value={markPaidDate} onChange={(e) => setMarkPaidDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+          </label>
+          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <button onClick={() => setMarkPaidInvoice(null)} type="button"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (markPaidInvoice) {
+                  updateInvoice({ ...markPaidInvoice, status: 'paid', paidDate: markPaidDate });
+                  setMarkPaidInvoice(null);
+                }
+              }}
+              disabled={!markPaidDate}
+              className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              Confirm Paid
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <InvoiceModal
         open={modalOpen}
