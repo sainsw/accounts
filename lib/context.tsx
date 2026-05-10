@@ -56,6 +56,7 @@ type AppContextValue = {
   addInvoice: (i: Omit<TrackedInvoice, 'id'>) => void;
   updateInvoice: (i: TrackedInvoice) => void;
   deleteInvoice: (id: string) => void;
+  deleteTransactionsByInvoiceId: (invoiceId: string) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -192,9 +193,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteInvoice = useCallback(
     (id: string) => {
       invoiceState.setValue((prev) => prev.filter((x) => x.id !== id));
-      txState.setValue((prev) => prev.filter((t) => t.invoiceId !== id));
     },
-    [invoiceState, txState]
+    [invoiceState]
+  );
+
+  const deleteTransactionsByInvoiceId = useCallback(
+    (invoiceId: string) => {
+      txState.setValue((prev) => prev.filter((t) => t.invoiceId !== invoiceId));
+    },
+    [txState]
   );
 
   const value = useMemo(
@@ -216,6 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addInvoice,
       updateInvoice,
       deleteInvoice,
+      deleteTransactionsByInvoiceId,
     }),
     [
       ready,
@@ -235,6 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addInvoice,
       updateInvoice,
       deleteInvoice,
+      deleteTransactionsByInvoiceId,
     ]
   );
 

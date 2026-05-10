@@ -48,7 +48,8 @@ export default function InvoicesPage() {
 }
 
 function InvoicesContent() {
-  const { ready, settings, invoices, clients, addInvoice, updateInvoice, deleteInvoice } = useApp();
+  const { ready, settings, invoices, clients, transactions, addInvoice, updateInvoice, deleteInvoice, deleteTransactionsByInvoiceId } = useApp();
+  const [confirmDeleteInvoice, setConfirmDeleteInvoice] = useState<TrackedInvoice | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TrackedInvoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<'' | TrackedInvoice['status']>('');
@@ -252,7 +253,14 @@ function InvoicesContent() {
                             </button>
                           )}
                           <button
-                            onClick={(e) => { e.stopPropagation(); deleteInvoice(inv.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (transactions.some((t) => t.invoiceId === inv.id)) {
+                                setConfirmDeleteInvoice(inv);
+                              } else {
+                                deleteInvoice(inv.id);
+                              }
+                            }}
                             className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                           >
                             <TrashIcon />
@@ -299,6 +307,52 @@ function InvoicesContent() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Delete invoice confirmation */}
+      <Modal open={!!confirmDeleteInvoice} onClose={() => setConfirmDeleteInvoice(null)} title="Delete Invoice">
+        {confirmDeleteInvoice && (() => {
+          const hasLinkedTx = transactions.some((t) => t.invoiceId === confirmDeleteInvoice.id);
+          return (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Delete invoice <span className="font-medium text-slate-900 dark:text-slate-100">#{confirmDeleteInvoice.invoiceNumber}</span> ({formatCurrency(confirmDeleteInvoice.amount, sym)})?
+              </p>
+              {hasLinkedTx && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  This invoice has a linked income transaction. Would you also like to remove it?
+                </p>
+              )}
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+                <button onClick={() => setConfirmDeleteInvoice(null)} type="button"
+                  className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                  Cancel
+                </button>
+                {hasLinkedTx && (
+                  <button
+                    onClick={() => {
+                      deleteInvoice(confirmDeleteInvoice.id);
+                      setConfirmDeleteInvoice(null);
+                    }}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    Delete Invoice Only
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (hasLinkedTx) deleteTransactionsByInvoiceId(confirmDeleteInvoice.id);
+                    deleteInvoice(confirmDeleteInvoice.id);
+                    setConfirmDeleteInvoice(null);
+                  }}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+                >
+                  {hasLinkedTx ? 'Delete Both' : 'Delete Invoice'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       <InvoiceModal
