@@ -5,7 +5,9 @@ import { useApp } from '@/lib/context';
 import { Card, PageHeader } from '@/components/Card';
 import { Button } from '@/components/Modal';
 import type { Settings } from '@/lib/types';
-import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '@/lib/defaults';
+import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES, UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META } from '@/lib/defaults';
+import { exportTransactionsCSV, exportInvoicesCSV, downloadCsv } from '@/lib/export';
+import { todayString } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { ready, settings, updateSettings } = useApp();
@@ -124,9 +126,90 @@ export default function SettingsPage() {
               </label>
             )}
             {settings.taxMode === 'uk-sole-trader' && (
-              <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-500/10 dark:text-blue-300">
-                UK Income Tax bands, Class 2 and Class 4 National Insurance will be calculated automatically based on your net profit. Rates are based on the 2024/25 tax year.
-              </div>
+              <>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Accounting Basis</span>
+                  <select value={settings.accountingBasis} onChange={(e) => { set('accountingBasis', e.target.value as Settings['accountingBasis']); flash(); }}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                    <option value="cash">Cash Basis</option>
+                    <option value="accruals">Accruals</option>
+                  </select>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {settings.accountingBasis === 'cash'
+                      ? 'Report income when you receive payment and expenses when you pay them.'
+                      : 'Report income when you invoice and expenses when you receive the bill.'}
+                  </p>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Student Loan Plan</span>
+                  <select value={settings.studentLoanPlan} onChange={(e) => { set('studentLoanPlan', e.target.value as Settings['studentLoanPlan']); flash(); }}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                    <option value="none">None</option>
+                    <option value="plan1">Plan 1 (9% above £22,015)</option>
+                    <option value="plan2">Plan 2 (9% above £27,295)</option>
+                    <option value="plan4">Plan 4 — Scotland (9% above £27,660)</option>
+                    <option value="plan5">Plan 5 (9% above £25,000)</option>
+                    <option value="postgrad">Postgraduate (6% above £21,000)</option>
+                  </select>
+                </label>
+                <div className="sm:col-span-2 flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={settings.voluntaryClass2NI} onChange={(e) => { set('voluntaryClass2NI', e.target.checked); flash(); }}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">I voluntarily pay Class 2 NI</span>
+                  </label>
+                  <span className="text-xs text-slate-400">(for state pension entitlement — not required from 2024/25)</span>
+                </div>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Locale</span>
+                  <select value={settings.locale} onChange={(e) => { set('locale', e.target.value); flash(); }}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                    <option value="en-GB">English (UK) — 5 Mar 2025</option>
+                    <option value="en-US">English (US) — Mar 5, 2025</option>
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* VAT Settings */}
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">VAT Settings</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2 flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={settings.vatRegistered} onChange={(e) => { set('vatRegistered', e.target.checked); flash(); }}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Registered</span>
+              </label>
+            </div>
+            {settings.vatRegistered && (
+              <>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Scheme</span>
+                  <select value={settings.vatScheme} onChange={(e) => { set('vatScheme', e.target.value as Settings['vatScheme']); flash(); }}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                    <option value="standard">Standard</option>
+                    <option value="flat-rate">Flat Rate Scheme</option>
+                    <option value="cash-accounting">Cash Accounting</option>
+                  </select>
+                </label>
+                {settings.vatScheme === 'flat-rate' && (
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Flat Rate (%)</span>
+                    <input type="number" min="0" max="100" step="0.5" value={settings.vatFlatRate}
+                      onChange={(e) => { set('vatFlatRate', parseFloat(e.target.value) || 0); flash(); }}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+                  </label>
+                )}
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Number</span>
+                  <input type="text" value={settings.vatNumber} onChange={(e) => { set('vatNumber', e.target.value); flash(); }}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
+                    placeholder="GB 123 4567 89" />
+                </label>
+              </>
             )}
           </div>
         </Card>
@@ -153,21 +236,42 @@ export default function SettingsPage() {
 
         {/* Cost Categories */}
         <Card>
-          <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Cost Categories</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Cost Categories</h2>
+            {settings.taxMode === 'uk-sole-trader' && (
+              <Button size="sm" variant="ghost" onClick={() => {
+                set('costCategories', UK_COST_CATEGORIES);
+                set('costCategoryMeta', DEFAULT_COST_CATEGORY_META);
+                flash();
+              }}>
+                Use UK Categories
+              </Button>
+            )}
+          </div>
           <div className="mb-3 flex flex-wrap gap-2">
-            {settings.costCategories.map((cat) => (
-              <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                {cat}
-                <button onClick={() => removeCategory('cost', cat)} className="ml-0.5 hover:text-red-500">&times;</button>
-              </span>
-            ))}
+            {settings.costCategories.map((cat) => {
+              const meta = (settings.costCategoryMeta || []).find((m) => m.name === cat);
+              const color = meta?.allowable === 'no'
+                ? 'bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300'
+                : meta?.allowable === 'partial'
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                  : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300';
+              return (
+                <span key={cat} className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${color}`}>
+                  {cat}
+                  {meta?.allowable === 'no' && <span className="text-[10px]">(non-allowable)</span>}
+                  {meta?.allowable === 'partial' && <span className="text-[10px]">(partial)</span>}
+                  <button onClick={() => removeCategory('cost', cat)} className="ml-0.5 hover:text-red-500">&times;</button>
+                </span>
+              );
+            })}
           </div>
           <div className="flex gap-2">
             <input type="text" value={newCostCat} onChange={(e) => setNewCostCat(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCategory('cost')}
               placeholder="New category" className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm dark:border-slate-600" />
             <Button size="sm" variant="secondary" onClick={() => addCategory('cost')}>Add</Button>
-            <Button size="sm" variant="ghost" onClick={() => { set('costCategories', DEFAULT_COST_CATEGORIES); flash(); }}>Reset</Button>
+            <Button size="sm" variant="ghost" onClick={() => { set('costCategories', DEFAULT_COST_CATEGORIES); set('costCategoryMeta', []); flash(); }}>Reset</Button>
           </div>
         </Card>
 
@@ -177,8 +281,9 @@ export default function SettingsPage() {
           <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
             All data is stored locally in your browser. Export your data to keep a backup.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <ExportButton />
+            <ExportCSVButton />
             <ImportButton />
           </div>
         </Card>
@@ -188,7 +293,7 @@ export default function SettingsPage() {
 }
 
 function ExportButton() {
-  const { transactions, clients, invoices, settings } = useApp();
+  const { transactions, clients, invoices, settings, updateSettings } = useApp();
   const handleExport = () => {
     const data = JSON.stringify({ settings, transactions, clients, invoices }, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
@@ -198,8 +303,29 @@ function ExportButton() {
     a.download = `accounts-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    updateSettings({ ...settings, lastExportDate: todayString() });
   };
-  return <Button variant="secondary" size="sm" onClick={handleExport}>Export Data</Button>;
+  return <Button variant="secondary" size="sm" onClick={handleExport}>Export JSON</Button>;
+}
+
+function ExportCSVButton() {
+  const { transactions, invoices, settings } = useApp();
+  return (
+    <div className="flex gap-2">
+      <Button variant="secondary" size="sm" onClick={() => {
+        const csv = exportTransactionsCSV(transactions, settings);
+        downloadCsv(csv, `transactions-${todayString()}.csv`);
+      }}>
+        Export Transactions CSV
+      </Button>
+      <Button variant="secondary" size="sm" onClick={() => {
+        const csv = exportInvoicesCSV(invoices);
+        downloadCsv(csv, `invoices-${todayString()}.csv`);
+      }}>
+        Export Invoices CSV
+      </Button>
+    </div>
+  );
 }
 
 function ImportButton() {

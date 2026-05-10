@@ -5,7 +5,9 @@ import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
-import type { Transaction, TransactionType } from '@/lib/types';
+import { calculateVatAmount } from '@/lib/vat';
+import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
+import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
 
 type FormData = Omit<Transaction, 'id'>;
 
@@ -18,6 +20,10 @@ const emptyForm = (): FormData => ({
   clientId: null,
   invoiceId: null,
   notes: '',
+  vatRate: null,
+  vatAmount: 0,
+  taxDeductible: true,
+  attachments: [],
 });
 
 export default function TransactionsPage() {
@@ -56,16 +62,10 @@ export default function TransactionsPage() {
   }, [filtered]);
 
   const sym = settings.currencySymbol || '$';
+  const locale = settings.locale || 'en-US';
 
-  const openNew = useCallback(() => {
-    setEditing(null);
-    setModalOpen(true);
-  }, []);
-
-  const openEdit = useCallback((t: Transaction) => {
-    setEditing(t);
-    setModalOpen(true);
-  }, []);
+  const openNew = useCallback(() => { setEditing(null); setModalOpen(true); }, []);
+  const openEdit = useCallback((t: Transaction) => { setEditing(t); setModalOpen(true); }, []);
 
   if (!ready) return null;
 
@@ -75,10 +75,20 @@ export default function TransactionsPage() {
         title="Transactions"
         description={`${transactions.length} total transactions`}
         actions={
-          <Button onClick={openNew}>
-            <PlusIcon />
-            Add Transaction
-          </Button>
+          <div className="flex gap-2">
+            {transactions.length > 0 && (
+              <Button variant="secondary" onClick={() => {
+                const csv = exportTransactionsCSV(filtered, settings);
+                downloadCsv(csv, `transactions-${todayString()}.csv`);
+              }}>
+                Export CSV
+              </Button>
+            )}
+            <Button onClick={openNew}>
+              <PlusIcon />
+              Add Transaction
+            </Button>
+          </div>
         }
       />
 
@@ -150,22 +160,34 @@ export default function TransactionsPage() {
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Client</th>
                   <th className="px-4 py-3 text-right">Amount</th>
+                  {settings.vatRegistered && <th className="px-4 py-3 text-right">VAT</th>}
                   <th className="px-4 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                 {filtered.map((t) => {
                   const client = t.clientId ? clients.find((c) => c.id === t.clientId) : null;
+                  const meta = (settings.costCategoryMeta || []).find((m) => m.name === t.category);
+                  const isNonDeductible = t.type === 'cost' && t.taxDeductible === false;
                   return (
                     <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openEdit(t)}>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(t.date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(t.date, locale)}</td>
                       <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                         {t.description}
                         {t.notes && <span className="ml-2 text-xs text-slate-400">{t.notes}</span>}
+                        {(t.attachments?.length || 0) > 0 && <span className="ml-1 text-xs text-slate-400" title={`${t.attachments.length} attachment(s)`}>📎</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                        <span className={cn(
+                          'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                          isNonDeductible
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300'
+                            : meta?.allowable === 'partial'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                        )}>
                           {t.category}
+                          {isNonDeductible && <span className="ml-1 text-[10px]">✗</span>}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{client?.name ?? ''}</td>
@@ -175,12 +197,14 @@ export default function TransactionsPage() {
                       )}>
                         {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount, sym)}
                       </td>
+                      {settings.vatRegistered && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-slate-500">
+                          {t.vatRate !== null && t.vatRate !== undefined ? `${formatCurrency(t.vatAmount || 0, sym)}` : '—'}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteTransaction(t.id);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }}
                           className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
                         >
                           <TrashIcon />
@@ -195,7 +219,6 @@ export default function TransactionsPage() {
         </Card>
       )}
 
-      {/* Add/Edit Modal */}
       <TransactionModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -226,7 +249,13 @@ function TransactionModal({
   open: boolean;
   onClose: () => void;
   editing: Transaction | null;
-  settings: { incomeCategories: string[]; costCategories: string[]; currencySymbol: string };
+  settings: {
+    incomeCategories: string[];
+    costCategories: string[];
+    currencySymbol: string;
+    vatRegistered: boolean;
+    costCategoryMeta?: CostCategoryMeta[];
+  };
   clients: { id: string; name: string }[];
   onSave: (data: FormData) => void;
 }) {
@@ -241,12 +270,13 @@ function TransactionModal({
     }
   }, [editing]);
 
-  // Reset form when modal opens
   useMemo(() => {
     if (open) handleOpen();
   }, [open, handleOpen]);
 
   const categories = (form.type === 'income' ? settings.incomeCategories : settings.costCategories) ?? [];
+  const categoryMeta = (settings.costCategoryMeta || []).find((m) => m.name === form.category);
+  const showAllowabilityWarning = form.type === 'cost' && categoryMeta && categoryMeta.allowable !== 'yes';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +287,31 @@ function TransactionModal({
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} exceeds 5MB limit`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const attachment: Attachment = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          data: ev.target?.result as string,
+        };
+        setForm((prev) => ({ ...prev, attachments: [...(prev.attachments || []), attachment] }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeAttachment = (id: string) => {
+    setForm((prev) => ({ ...prev, attachments: (prev.attachments || []).filter((a) => a.id !== id) }));
+  };
+
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit Transaction' : 'New Transaction'}>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -266,16 +321,11 @@ function TransactionModal({
             <button
               key={t}
               type="button"
-              onClick={() => {
-                set('type', t);
-                set('category', '');
-              }}
+              onClick={() => { set('type', t); set('category', ''); }}
               className={cn(
                 'flex-1 px-4 py-2 text-sm font-medium capitalize transition-colors first:rounded-l-lg last:rounded-r-lg',
                 form.type === t
-                  ? t === 'income'
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-red-500 text-white'
+                  ? t === 'income' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
               )}
             >
@@ -287,77 +337,128 @@ function TransactionModal({
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => set('date', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-            />
+            <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({settings.currencySymbol})</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.amount || ''}
-              onChange={(e) => set('amount', parseFloat(e.target.value) || 0)}
+            <input type="number" step="0.01" min="0" value={form.amount || ''} onChange={(e) => {
+              const amt = parseFloat(e.target.value) || 0;
+              set('amount', amt);
+              if (form.vatRate !== null && form.vatRate !== undefined) {
+                set('vatAmount', calculateVatAmount(amt, form.vatRate));
+              }
+            }}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-              placeholder="0.00"
-            />
+              placeholder="0.00" />
           </label>
         </div>
 
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
-          <input
-            type="text"
-            value={form.description}
-            onChange={(e) => set('description', e.target.value)}
+          <input type="text" value={form.description} onChange={(e) => set('description', e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-            placeholder="What was this for?"
-          />
+            placeholder="What was this for?" />
         </label>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</span>
-            <select
-              value={form.category}
-              onChange={(e) => set('category', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-            >
+            <select value={form.category} onChange={(e) => {
+              set('category', e.target.value);
+              const meta = (settings.costCategoryMeta || []).find((m) => m.name === e.target.value);
+              if (meta?.allowable === 'no') set('taxDeductible', false);
+              else if (meta?.allowable === 'yes') set('taxDeductible', true);
+            }}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600">
               <option value="">Select...</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
-            <select
-              value={form.clientId ?? ''}
-              onChange={(e) => set('clientId', e.target.value || null)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-            >
+            <select value={form.clientId ?? ''} onChange={(e) => set('clientId', e.target.value || null)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600">
               <option value="">None</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
         </div>
 
+        {/* Allowability warning */}
+        {showAllowabilityWarning && (
+          <div className={cn(
+            'rounded-lg p-3 text-xs',
+            categoryMeta.allowable === 'no'
+              ? 'bg-orange-50 text-orange-800 dark:bg-orange-500/10 dark:text-orange-300'
+              : 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+          )}>
+            {categoryMeta.allowable === 'no' ? (
+              <p>This category is <strong>not tax-deductible</strong>. It will not reduce your taxable profit.</p>
+            ) : (
+              <>
+                <p>{categoryMeta.note || 'This category is partially allowable.'}</p>
+                <label className="mt-2 flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.taxDeductible} onChange={(e) => set('taxDeductible', e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
+                  <span className="font-medium">This expense is tax-deductible</span>
+                </label>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* VAT rate selector */}
+        {settings.vatRegistered && (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">VAT Rate</span>
+              <select value={form.vatRate ?? ''} onChange={(e) => {
+                const rate = e.target.value === '' ? null : parseFloat(e.target.value);
+                set('vatRate', rate);
+                set('vatAmount', calculateVatAmount(form.amount, rate));
+              }}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
+                <option value="">Exempt / N/A</option>
+                <option value="20">20% Standard</option>
+                <option value="5">5% Reduced</option>
+                <option value="0">0% Zero-rated</option>
+              </select>
+            </label>
+            <div className="flex flex-col justify-end">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Net: {formatCurrency(form.amount, settings.currencySymbol)}
+                {form.vatRate !== null && form.vatRate !== undefined && ` + VAT: ${formatCurrency(form.vatAmount || 0, settings.currencySymbol)} = ${formatCurrency(form.amount + (form.vatAmount || 0), settings.currencySymbol)}`}
+              </p>
+            </div>
+          </div>
+        )}
+
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
-          <textarea
-            value={form.notes}
-            onChange={(e) => set('notes', e.target.value)}
-            rows={2}
+          <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-            placeholder="Optional notes"
-          />
+            placeholder="Optional notes" />
         </label>
+
+        {/* Attachments */}
+        <div>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Receipts / Attachments</span>
+          <div className="mt-1">
+            <input type="file" accept="image/*,.pdf" multiple onChange={handleFileUpload}
+              className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
+          </div>
+          {(form.attachments || []).length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {form.attachments.map((a) => (
+                <span key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs dark:bg-slate-700">
+                  {a.name}
+                  <button type="button" onClick={() => removeAttachment(a.id)} className="text-red-400 hover:text-red-600">&times;</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
           <button onClick={onClose} type="button"

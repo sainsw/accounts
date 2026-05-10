@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useApp } from '@/lib/context';
 import type { Settings, TaxMode } from '@/lib/types';
+import { UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META } from '@/lib/defaults';
 
 const CURRENCY_PRESETS = [
   { symbol: '£', label: 'GBP (£)' },
@@ -48,12 +49,17 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
 
   function finish() {
     const finalCurrency = isCustomCurrency ? customCurrency || currency : currency;
+    const isUK = taxMode === 'uk-sole-trader';
     updateSettings({
       ...settings,
       currencySymbol: finalCurrency,
       taxYear,
       taxMode,
       taxRate: taxMode === 'flat' ? flatRate : settings.taxRate,
+      locale: isUK ? 'en-GB' : settings.locale,
+      accountingBasis: isUK ? 'cash' : settings.accountingBasis,
+      costCategories: isUK ? UK_COST_CATEGORIES : settings.costCategories,
+      costCategoryMeta: isUK ? DEFAULT_COST_CATEGORY_META : settings.costCategoryMeta,
     });
     onComplete();
   }
@@ -62,6 +68,23 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
     step === 0
       ? (isCustomCurrency ? customCurrency.trim().length > 0 : true)
       : true;
+
+  const handleCurrencySelect = (symbol: string) => {
+    setCurrency(symbol);
+    setCustomCurrency('');
+    if (symbol === '£') {
+      setTaxYear('apr-mar');
+      setTaxMode('uk-sole-trader');
+    }
+  };
+
+  const handleTaxModeSelect = (mode: TaxMode) => {
+    setTaxMode(mode);
+    if (mode === 'uk-sole-trader' && currency !== '£') {
+      setCurrency('£');
+      setTaxYear('apr-mar');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -105,7 +128,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 {CURRENCY_PRESETS.map((p) => (
                   <button
                     key={p.symbol}
-                    onClick={() => { setCurrency(p.symbol); setCustomCurrency(''); }}
+                    onClick={() => handleCurrencySelect(p.symbol)}
                     className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
                       currency === p.symbol
                         ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 dark:border-brand-400'
@@ -172,7 +195,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
                 {TAX_MODE_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() => setTaxMode(opt.value)}
+                    onClick={() => handleTaxModeSelect(opt.value)}
                     className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
                       taxMode === opt.value
                         ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/15 dark:border-brand-400'

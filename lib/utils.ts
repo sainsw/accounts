@@ -11,22 +11,22 @@ export function formatCurrency(amount: number, symbol: string = '$'): string {
   return `${sign}${symbol}${formatted}`;
 }
 
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string, locale: string = 'en-US'): string {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
 }
 
-export function formatMonth(dateStr: string): string {
+export function formatMonth(dateStr: string, locale: string = 'en-US'): string {
   if (!dateStr) return '';
   const [y, m] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1);
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 }
 
 export function todayString(): string {
@@ -80,4 +80,39 @@ export function isInRange(date: string, start: string, end: string): boolean {
 
 export function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ');
+}
+
+export function getFinancialYear(date: string, taxYear: string): number {
+  const [y, m] = date.split('-').map(Number);
+  switch (taxYear) {
+    case 'apr-mar':
+      return m >= 4 ? y : y - 1;
+    case 'jul-jun':
+      return m >= 7 ? y : y - 1;
+    case 'oct-sep':
+      return m >= 10 ? y : y - 1;
+    default:
+      return y;
+  }
+}
+
+export function getVatQuarter(date: string, staggerGroup: number = 1): { quarter: number; year: number; label: string; start: string; end: string } {
+  const [y, m] = date.split('-').map(Number);
+  const offset = ((staggerGroup - 1) % 3);
+  const adjustedMonth = ((m - 1 - offset + 12) % 12);
+  const quarter = Math.floor(adjustedMonth / 3) + 1;
+
+  const qStartMonth = ((quarter - 1) * 3 + offset) % 12 + 1;
+  const qStartYear = qStartMonth > m ? y - 1 : y;
+  const qEndMonth = (qStartMonth + 2 - 1) % 12 + 1;
+  const qEndYear = qEndMonth < qStartMonth ? qStartYear + 1 : qStartYear;
+  const lastDay = new Date(qEndYear, qEndMonth, 0).getDate();
+
+  return {
+    quarter,
+    year: qStartYear,
+    label: `Q${quarter} ${qStartYear}/${String(qStartYear + 1).slice(2)}`,
+    start: `${qStartYear}-${String(qStartMonth).padStart(2, '0')}-01`,
+    end: `${qEndYear}-${String(qEndMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+  };
 }

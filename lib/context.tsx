@@ -17,6 +17,24 @@ import { defaultSettings, STORAGE_KEYS } from './defaults';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { generateId, todayString } from './utils';
 
+function migrateTransaction(t: Partial<Transaction> & { id: string }): Transaction {
+  return {
+    date: '',
+    type: 'cost',
+    amount: 0,
+    description: '',
+    category: '',
+    clientId: null,
+    invoiceId: null,
+    notes: '',
+    vatRate: null,
+    vatAmount: 0,
+    taxDeductible: true,
+    attachments: [],
+    ...t,
+  };
+}
+
 type AppContextValue = {
   ready: boolean;
   onboardingDone: boolean;
@@ -45,11 +63,11 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const settingsState = usePersistentState(STORAGE_KEYS.settings, () => defaultSettings);
 
-  // Migrate stale localStorage: merge defaults so new keys are always present
   const settings: Settings = useMemo(
     () => ({ ...defaultSettings, ...settingsState.value }),
     [settingsState.value]
   );
+
   const txState = usePersistentState<Transaction[]>(STORAGE_KEYS.transactions, () => []);
   const clientState = usePersistentState<Client[]>(STORAGE_KEYS.clients, () => []);
   const invoiceState = usePersistentState<TrackedInvoice[]>(STORAGE_KEYS.invoices, () => []);
@@ -57,6 +75,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const ready =
     settingsState.ready && txState.ready && clientState.ready && invoiceState.ready && onboardingState.ready;
+
+  const transactions = useMemo(
+    () => txState.value.map(migrateTransaction),
+    [txState.value]
+  );
 
   const completeOnboarding = useCallback(() => {
     onboardingState.setValue(true);
@@ -123,6 +146,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           clientId: i.clientId,
           invoiceId,
           notes: '',
+          vatRate: null,
+          vatAmount: 0,
+          taxDeductible: true,
+          attachments: [],
         };
         txState.setValue((prev) => [tx, ...prev]);
       }
@@ -135,7 +162,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       invoiceState.setValue((prev) => prev.map((x) => (x.id === i.id ? i : x)));
 
       if (i.status === 'paid') {
-        // Create income transaction if one doesn't already exist for this invoice
         txState.setValue((prev) => {
           const exists = prev.some((t) => t.invoiceId === i.id);
           if (exists) return prev;
@@ -149,11 +175,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             clientId: i.clientId,
             invoiceId: i.id,
             notes: '',
+            vatRate: null,
+            vatAmount: 0,
+            taxDeductible: true,
+            attachments: [],
           };
           return [tx, ...prev];
         });
       } else {
-        // If status changed away from paid, remove the auto-created transaction
         txState.setValue((prev) => prev.filter((t) => t.invoiceId !== i.id));
       }
     },
@@ -163,7 +192,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteInvoice = useCallback(
     (id: string) => {
       invoiceState.setValue((prev) => prev.filter((x) => x.id !== id));
-      // Remove any auto-created transaction linked to this invoice
       txState.setValue((prev) => prev.filter((t) => t.invoiceId !== id));
     },
     [invoiceState, txState]
@@ -176,7 +204,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       settings,
       updateSettings: settingsState.setValue,
-      transactions: txState.value,
+      transactions,
       addTransaction,
       updateTransaction,
       deleteTransaction,
@@ -195,7 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       settings,
       settingsState.setValue,
-      txState.value,
+      transactions,
       addTransaction,
       updateTransaction,
       deleteTransaction,

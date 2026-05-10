@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
-import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
+import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
 import type { TrackedInvoice } from '@/lib/types';
 import dynamic from 'next/dynamic';
 
@@ -52,13 +52,18 @@ function InvoicesContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TrackedInvoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<'' | TrackedInvoice['status']>('');
+  const [priorYearFilter, setPriorYearFilter] = useState(false);
   const [showImporter, setShowImporter] = useState(false);
   const [importData, setImportData] = useState<FormData | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const importProcessed = useRef(false);
 
-  // Handle ?import= param from invoicer (once only)
+  const locale = settings.locale || 'en-US';
+  const today = todayString();
+  const currentFinYear = getFinancialYear(today, settings.taxYear);
+  const currentYearRange = getYearRange(currentFinYear, settings.taxYear);
+
   useEffect(() => {
     if (!ready || importProcessed.current) return;
     const raw = searchParams.get('import');
@@ -80,7 +85,6 @@ function InvoicesContent() {
       setImportData(prefilled);
       setEditing(null);
       setModalOpen(true);
-      // Clean the URL via the router so Next.js updates its internal state
       router.replace('/invoices');
     } catch {
       // Invalid import data, ignore
@@ -90,8 +94,15 @@ function InvoicesContent() {
   const filtered = useMemo(() => {
     let list = [...invoices].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
     if (statusFilter) list = list.filter((i) => i.status === statusFilter);
+    if (priorYearFilter) {
+      list = list.filter((i) => {
+        const issuedBefore = i.issueDate < currentYearRange.start;
+        const unpaid = i.status !== 'paid';
+        return issuedBefore && unpaid;
+      });
+    }
     return list;
-  }, [invoices, statusFilter]);
+  }, [invoices, statusFilter, priorYearFilter, currentYearRange]);
 
   const stats = useMemo(() => {
     const total = invoices.reduce((s, i) => s + i.amount, 0);
@@ -110,6 +121,12 @@ function InvoicesContent() {
   const [markPaidDate, setMarkPaidDate] = useState(todayString());
 
   if (!ready) return null;
+
+  const crossesTaxYear = (inv: TrackedInvoice) => {
+    if (inv.status === 'paid') return false;
+    const issueYear = getFinancialYear(inv.issueDate, settings.taxYear);
+    return issueYear < currentFinYear;
+  };
 
   return (
     <>
@@ -146,14 +163,14 @@ function InvoicesContent() {
         </div>
       )}
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {(['', 'draft', 'sent', 'paid', 'overdue'] as const).map((s) => (
           <button
             key={s}
-            onClick={() => setStatusFilter(s)}
+            onClick={() => { setStatusFilter(s); setPriorYearFilter(false); }}
             className={cn(
               'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-              statusFilter === s
+              statusFilter === s && !priorYearFilter
                 ? 'bg-brand-500 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
             )}
@@ -161,6 +178,17 @@ function InvoicesContent() {
             {s ? STATUS_LABELS[s] : 'All'}
           </button>
         ))}
+        <button
+          onClick={() => { setPriorYearFilter(!priorYearFilter); setStatusFilter(''); }}
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            priorYearFilter
+              ? 'bg-amber-500 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+          )}
+        >
+          Unpaid from prior year
+        </button>
       </div>
 
       {filtered.length === 0 ? (
@@ -185,42 +213,55 @@ function InvoicesContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                {filtered.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openEdit(inv)}>
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{inv.clientName}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(inv.issueDate)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{inv.dueDate ? formatDate(inv.dueDate) : '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(inv.amount, sym)}</td>
-                    <td className="px-4 py-3">
-                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLORS[inv.status])}>
-                        {STATUS_LABELS[inv.status]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {(inv.status === 'sent' || inv.status === 'overdue') && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMarkPaidDate(inv.dueDate || inv.issueDate || todayString());
-                              setMarkPaidInvoice(inv);
-                            }}
-                            className="rounded px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                          >
-                            Mark Paid
-                          </button>
+                {filtered.map((inv) => {
+                  const crossesBoundary = crossesTaxYear(inv);
+                  return (
+                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openEdit(inv)}>
+                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{inv.clientName}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(inv.issueDate, locale)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{inv.dueDate ? formatDate(inv.dueDate, locale) : '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(inv.amount, sym)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_COLORS[inv.status])}>
+                            {STATUS_LABELS[inv.status]}
+                          </span>
+                          {crossesBoundary && (
+                            <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" title="This invoice crosses a tax year boundary">
+                              Crosses tax year
+                            </span>
+                          )}
+                        </div>
+                        {crossesBoundary && settings.accountingBasis === 'cash' && (
+                          <p className="mt-0.5 text-[10px] text-slate-400">Cash basis: won&apos;t affect prior year tax</p>
                         )}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteInvoice(inv.id); }}
-                          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          {(inv.status === 'sent' || inv.status === 'overdue') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMarkPaidDate(inv.dueDate || inv.issueDate || todayString());
+                                setMarkPaidInvoice(inv);
+                              }}
+                              className="rounded px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteInvoice(inv.id); }}
+                            className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

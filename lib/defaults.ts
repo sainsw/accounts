@@ -1,4 +1,4 @@
-import type { Settings } from './types';
+import type { Settings, CostCategoryMeta } from './types';
 
 export const DEFAULT_INCOME_CATEGORIES = [
   'Consulting',
@@ -28,6 +28,52 @@ export const DEFAULT_COST_CATEGORIES = [
   'Other Cost',
 ];
 
+export const UK_COST_CATEGORIES = [
+  'Software & Tools',
+  'Hardware & Equipment',
+  'Office Supplies',
+  'Travel',
+  'Vehicle / Mileage',
+  'Meals & Entertainment',
+  'Professional Services',
+  'Accountancy Fees',
+  'Insurance',
+  'Marketing & Advertising',
+  'Education & Training',
+  'Bank Fees',
+  'Taxes & Licenses',
+  'Utilities',
+  'Telephone & Internet',
+  'Rent',
+  'Use of Home',
+  'Subscriptions & Memberships',
+  'Fines & Penalties',
+  'Other Cost',
+];
+
+export const DEFAULT_COST_CATEGORY_META: CostCategoryMeta[] = [
+  { name: 'Software & Tools', allowable: 'yes' },
+  { name: 'Hardware & Equipment', allowable: 'yes' },
+  { name: 'Office Supplies', allowable: 'yes' },
+  { name: 'Travel', allowable: 'yes' },
+  { name: 'Vehicle / Mileage', allowable: 'yes' },
+  { name: 'Meals & Entertainment', allowable: 'partial', note: 'Business meals only — client entertaining is not allowable' },
+  { name: 'Professional Services', allowable: 'yes' },
+  { name: 'Accountancy Fees', allowable: 'yes' },
+  { name: 'Insurance', allowable: 'yes' },
+  { name: 'Marketing & Advertising', allowable: 'yes' },
+  { name: 'Education & Training', allowable: 'yes' },
+  { name: 'Bank Fees', allowable: 'yes' },
+  { name: 'Taxes & Licenses', allowable: 'yes' },
+  { name: 'Utilities', allowable: 'yes' },
+  { name: 'Telephone & Internet', allowable: 'partial', note: 'Business portion only' },
+  { name: 'Rent', allowable: 'yes' },
+  { name: 'Use of Home', allowable: 'yes' },
+  { name: 'Subscriptions & Memberships', allowable: 'yes' },
+  { name: 'Fines & Penalties', allowable: 'no' },
+  { name: 'Other Cost', allowable: 'yes' },
+];
+
 export const defaultSettings: Settings = {
   businessName: '',
   businessAddress: '',
@@ -39,6 +85,16 @@ export const defaultSettings: Settings = {
   taxRate: 0,
   incomeCategories: DEFAULT_INCOME_CATEGORIES,
   costCategories: DEFAULT_COST_CATEGORIES,
+  costCategoryMeta: [],
+  locale: 'en-US',
+  vatRegistered: false,
+  vatScheme: 'standard',
+  vatFlatRate: 0,
+  vatNumber: '',
+  voluntaryClass2NI: false,
+  studentLoanPlan: 'none',
+  accountingBasis: 'cash',
+  lastExportDate: null,
 };
 
 export const STORAGE_KEYS = {
