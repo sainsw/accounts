@@ -11,7 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@sainsw/invoice-pdf": "file:../invoice-pdf",
+    "@sainsw/invoice-pdf": "^1.0.0",
     "next": "16.2.6",
     "pdfjs-dist": "^4.10.38",
     "react": "19.2.4",
