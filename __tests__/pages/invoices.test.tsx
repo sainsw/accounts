@@ -15,6 +15,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
+vi.mock('@/lib/invoice-pdf-adapter', () => ({
+  downloadInvoicePdf: vi.fn(),
+}));
+
 vi.mock('next/dynamic', () => ({
   default: (loader: () => Promise<any>) => {
     // Return a placeholder component for PdfImportWizard
