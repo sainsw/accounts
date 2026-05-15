@@ -17,7 +17,7 @@ import { defaultSettings, STORAGE_KEYS } from './defaults';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { generateId, todayString } from './utils';
 
-function migrateTransaction(t: Partial<Transaction> & { id: string }): Transaction {
+export function migrateTransaction(t: Partial<Transaction> & { id: string }): Transaction {
   return {
     date: '',
     type: 'cost',

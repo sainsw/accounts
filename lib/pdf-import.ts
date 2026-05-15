@@ -66,7 +66,7 @@ async function extractLines(file: File): Promise<string[]> {
 /**
  * Try to parse a date string. Returns ISO YYYY-MM-DD or empty string.
  */
-function parseDate(raw: string): string {
+export function parseDate(raw: string): string {
   if (!raw) return '';
   const trimmed = raw.trim();
 
@@ -98,7 +98,7 @@ function parseDate(raw: string): string {
 /**
  * Extract a currency amount from a string like "$1,234.56" or "£500.00"
  */
-function parseAmount(raw: string): number {
+export function parseAmount(raw: string): number {
   if (!raw) return 0;
   const cleaned = raw.replace(/[^0-9.]/g, '');
   const num = parseFloat(cleaned);
@@ -108,7 +108,7 @@ function parseAmount(raw: string): number {
 /**
  * Extract invoice number from filename as fallback.
  */
-function invoiceNumberFromFilename(name: string): string {
+export function invoiceNumberFromFilename(name: string): string {
   const base = name.replace(/\.pdf$/i, '');
 
   const invMatch = /\b(INV[.\-_]?\d+)\b/i.exec(base);

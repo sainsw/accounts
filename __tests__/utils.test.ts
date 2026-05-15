@@ -7,6 +7,11 @@ import {
   isInRange,
   cn,
   getFinancialYear,
+  generateId,
+  todayString,
+  monthString,
+  getMonthRange,
+  getVatQuarter,
 } from '../lib/utils';
 
 describe('formatCurrency', () => {
@@ -103,6 +108,116 @@ describe('cn', () => {
 
   it('filters falsy values', () => {
     expect(cn('a', false, null, undefined, 'b')).toBe('a b');
+  });
+});
+
+describe('generateId', () => {
+  it('returns a string', () => {
+    expect(typeof generateId()).toBe('string');
+  });
+
+  it('returns unique values on consecutive calls', () => {
+    const a = generateId();
+    const b = generateId();
+    expect(a).not.toBe(b);
+  });
+});
+
+describe('todayString', () => {
+  it('returns YYYY-MM-DD format matching today', () => {
+    const result = todayString();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const today = new Date().toISOString().split('T')[0];
+    expect(result).toBe(today);
+  });
+});
+
+describe('monthString', () => {
+  it('returns YYYY-MM format matching current month', () => {
+    const result = monthString();
+    expect(result).toMatch(/^\d{4}-\d{2}$/);
+    const today = new Date().toISOString().split('T')[0].slice(0, 7);
+    expect(result).toBe(today);
+  });
+});
+
+describe('getMonthRange', () => {
+  it('returns correct start and end for a 31-day month', () => {
+    const range = getMonthRange('2024-01');
+    expect(range.start).toBe('2024-01-01');
+    expect(range.end).toBe('2024-01-31');
+  });
+
+  it('returns correct end for a 30-day month', () => {
+    const range = getMonthRange('2024-04');
+    expect(range.start).toBe('2024-04-01');
+    expect(range.end).toBe('2024-04-30');
+  });
+
+  it('returns correct end for February in a non-leap year', () => {
+    const range = getMonthRange('2025-02');
+    expect(range.start).toBe('2025-02-01');
+    expect(range.end).toBe('2025-02-28');
+  });
+
+  it('returns correct end for February in a leap year', () => {
+    const range = getMonthRange('2024-02');
+    expect(range.start).toBe('2024-02-01');
+    expect(range.end).toBe('2024-02-29');
+  });
+});
+
+describe('getVatQuarter', () => {
+  it('returns correct quarter for stagger group 1 (Apr–Jun is Q2)', () => {
+    const result = getVatQuarter('2024-05-15', 1);
+    expect(result.quarter).toBe(2);
+    expect(result.year).toBe(2024);
+    expect(result.start).toBe('2024-04-01');
+    expect(result.end).toBe('2024-06-30');
+    expect(result.label).toBe('Q2 2024/25');
+  });
+
+  it('returns correct quarter for stagger group 2 (Feb–Apr is Q1)', () => {
+    const result = getVatQuarter('2024-03-15', 2);
+    expect(result.quarter).toBe(1);
+    expect(result.start).toBe('2024-02-01');
+    expect(result.end).toBe('2024-04-30');
+  });
+
+  it('returns correct quarter for stagger group 3 (Mar–May is Q1)', () => {
+    const result = getVatQuarter('2024-04-10', 3);
+    expect(result.quarter).toBe(1);
+    expect(result.start).toBe('2024-03-01');
+    expect(result.end).toBe('2024-05-31');
+  });
+
+  it('handles Q4 crossing year boundary (Dec–Feb in stagger group 3)', () => {
+    const result = getVatQuarter('2025-01-15', 3);
+    expect(result.quarter).toBe(4);
+    expect(result.year).toBe(2024);
+    expect(result.start).toBe('2024-12-01');
+    expect(result.end).toBe('2025-02-28');
+  });
+});
+
+describe('formatCurrency additional', () => {
+  it('handles very large numbers', () => {
+    const result = formatCurrency(1234567.89, '£');
+    expect(result).toBe('£1,234,567.89');
+  });
+});
+
+describe('formatDate additional', () => {
+  it('returns empty string for empty input', () => {
+    expect(formatDate('')).toBe('');
+  });
+});
+
+describe('formatMonth additional', () => {
+  it('returns correct output for en-GB locale', () => {
+    const result = formatMonth('2025-03', 'en-GB');
+    expect(result).toContain('March');
+    expect(result).toContain('2025');
   });
 });
 
