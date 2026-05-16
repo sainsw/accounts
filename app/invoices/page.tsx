@@ -10,6 +10,8 @@ import type { TrackedInvoice, InvoiceWorkBlock, InvoiceExpense } from '@/lib/typ
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-adapter';
 import { computeInvoiceTotals, getWeekdays } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
+import { WorkBlocksEditor } from '@/components/WorkBlocksEditor';
+import { ExpensesEditor } from '@/components/ExpensesEditor';
 
 const PdfImportWizard = dynamic(() => import('@/components/PdfImportWizard'), { ssr: false });
 
@@ -579,110 +581,64 @@ function InvoiceModal({
         </div>
 
         {itemized && (
-          <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/30">
+          <div className="space-y-6">
             {/* Work Blocks */}
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Work Blocks</h3>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white">Work blocks</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Weekdays only — weekends are skipped automatically.</p>
+                </div>
                 <button type="button" onClick={() => set('workBlocks', [...workBlocks, newWorkBlock(defaultRate)])}
-                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10">
-                  <PlusIcon /> Add
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
+                  + Add block
                 </button>
               </div>
-              {workBlocks.length === 0 && (
-                <p className="text-xs text-slate-400">No work blocks yet</p>
+              {workBlocks.length === 0 ? (
+                <p className="text-sm text-slate-400">No work blocks yet.</p>
+              ) : (
+                <WorkBlocksEditor
+                  blocks={workBlocks}
+                  currencySymbol={sym}
+                  inputCls={inputCls}
+                  onChange={setWorkBlock}
+                  onRemove={(id) => set('workBlocks', workBlocks.filter((w) => w.id !== id))}
+                  onDuplicate={(id) => {
+                    const wb = workBlocks.find((w) => w.id === id);
+                    if (wb) set('workBlocks', [...workBlocks, { ...wb, id: uid() }]);
+                  }}
+                  onReorder={(ids) => {
+                    const map = new Map(workBlocks.map((w) => [w.id, w]));
+                    set('workBlocks', ids.map((id) => map.get(id)!));
+                  }}
+                />
               )}
-              <div className="space-y-2">
-                {workBlocks.map((wb) => {
-                  const days = getWeekdays(wb.startDate, wb.endDate);
-                  const hasError = days <= 0 && wb.startDate && wb.endDate;
-                  return (
-                  <div key={wb.id} className="space-y-1 rounded-lg bg-white p-3 shadow-sm dark:bg-slate-800">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-end gap-3">
-                      <label className="block">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Description</span>
-                        <input type="text" value={wb.description} onChange={(e) => setWorkBlock(wb.id, { description: e.target.value })}
-                          className={inputCls} placeholder="Service description" />
-                      </label>
-                      <label className="block w-36">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Start</span>
-                        <input type="date" value={wb.startDate} onChange={(e) => setWorkBlock(wb.id, { startDate: e.target.value })}
-                          className={inputCls} />
-                      </label>
-                      <label className="block w-36">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">End</span>
-                        <input type="date" value={wb.endDate} onChange={(e) => setWorkBlock(wb.id, { endDate: e.target.value })}
-                          className={inputCls} />
-                      </label>
-                      <div className="block w-12 text-center">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Days</span>
-                        <div className="mt-1 py-2 text-sm font-medium text-slate-700 dark:text-slate-300">{days > 0 ? days : '—'}</div>
-                      </div>
-                      <label className="block w-28">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Rate ({sym})</span>
-                        <input type="number" step="0.01" min="0"
-                          value={wb.dailyRate || ''}
-                          onChange={(e) => setWorkBlock(wb.id, { dailyRate: parseFloat(e.target.value) || 0 })}
-                          className={inputCls} />
-                      </label>
-                      <label className="block w-28">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total ({sym})</span>
-                        <input type="number" step="0.01" min="0"
-                          value={wb.blockTotal || ''}
-                          onChange={(e) => setWorkBlock(wb.id, { blockTotal: parseFloat(e.target.value) || 0 })}
-                          className={inputCls} />
-                      </label>
-                      <button type="button" onClick={() => set('workBlocks', workBlocks.filter((w) => w.id !== wb.id))}
-                        className="mb-0.5 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
-                        <TrashIcon />
-                      </button>
-                    </div>
-                    {hasError && (
-                      <p className="text-sm text-red-500">End date must be after start date.</p>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Expenses */}
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expenses</h3>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Expenses</h3>
                 <button type="button" onClick={() => set('expenses', [...expenses, newExpense()])}
-                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10">
-                  <PlusIcon /> Add
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
+                  + Add expense
                 </button>
               </div>
-              {expenses.length === 0 && (
-                <p className="text-xs text-slate-400">No expenses</p>
+              {expenses.length === 0 ? (
+                <p className="text-sm text-slate-400">No expenses yet.</p>
+              ) : (
+                <ExpensesEditor
+                  expenses={expenses}
+                  currencySymbol={sym}
+                  inputCls={inputCls}
+                  onChange={setExpense}
+                  onRemove={(id) => set('expenses', expenses.filter((e2) => e2.id !== id))}
+                  onReorder={(ids) => {
+                    const map = new Map(expenses.map((e) => [e.id, e]));
+                    set('expenses', ids.map((id) => map.get(id)!));
+                  }}
+                />
               )}
-              <div className="space-y-2">
-                {expenses.map((ex) => (
-                  <div key={ex.id} className="grid grid-cols-[auto_1fr_auto_auto] items-end gap-3 rounded-lg bg-white p-3 shadow-sm dark:bg-slate-800">
-                    <label className="block w-36">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
-                      <input type="date" value={ex.date} onChange={(e) => setExpense(ex.id, { date: e.target.value })}
-                        className={inputCls} />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
-                      <input type="text" value={ex.notes} onChange={(e) => setExpense(ex.id, { notes: e.target.value })}
-                        className={inputCls} placeholder="Expense description" />
-                    </label>
-                    <label className="block w-28">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({sym})</span>
-                      <input type="number" step="0.01" min="0" value={ex.amount || ''} onChange={(e) => setExpense(ex.id, { amount: parseFloat(e.target.value) || 0 })}
-                        className={inputCls} />
-                    </label>
-                    <button type="button" onClick={() => set('expenses', expenses.filter((e2) => e2.id !== ex.id))}
-                      className="mb-0.5 rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
-                      <TrashIcon />
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* Tax */}
