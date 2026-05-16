@@ -161,33 +161,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateInvoice = useCallback(
     (i: TrackedInvoice) => {
       invoiceState.setValue((prev) => prev.map((x) => (x.id === i.id ? i : x)));
-
-      if (i.status === 'paid') {
-        txState.setValue((prev) => {
-          const exists = prev.some((t) => t.invoiceId === i.id);
-          if (exists) return prev;
-          const tx: Transaction = {
-            id: generateId(),
-            date: i.paidDate || todayString(),
-            type: 'income',
-            amount: i.amount,
-            description: `Invoice ${i.invoiceNumber} — ${i.clientName}`,
-            category: 'Consulting',
-            clientId: i.clientId,
-            invoiceId: i.id,
-            notes: '',
-            vatRate: null,
-            vatAmount: 0,
-            taxDeductible: true,
-            attachments: [],
-          };
-          return [tx, ...prev];
-        });
-      } else {
-        txState.setValue((prev) => prev.filter((t) => t.invoiceId !== i.id));
-      }
     },
-    [invoiceState, txState]
+    [invoiceState]
   );
 
   const deleteInvoice = useCallback(

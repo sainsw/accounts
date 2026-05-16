@@ -6,7 +6,7 @@ import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
-import type { TrackedInvoice, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
+import type { TrackedInvoice, Transaction, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-adapter';
 import { computeInvoiceTotals, getWeekdays } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
@@ -144,6 +144,7 @@ function InvoicesContent() {
   const [markPaidInvoice, setMarkPaidInvoice] = useState<TrackedInvoice | null>(null);
   const [markPaidDate, setMarkPaidDate] = useState(todayString());
   const [confirmReplaceTx, setConfirmReplaceTx] = useState(false);
+  const [pendingStatusSave, setPendingStatusSave] = useState<{ data: FormData; linkedTxs: Transaction[] } | null>(null);
 
   if (!ready) return null;
 
@@ -406,6 +407,54 @@ function InvoicesContent() {
         })()}
       </Modal>
 
+      {/* Confirm delete linked transactions on status change */}
+      <Modal open={!!pendingStatusSave} onClose={() => setPendingStatusSave(null)} title="Delete Linked Transactions?">
+        {pendingStatusSave && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Changing status from <span className="font-medium text-slate-900 dark:text-slate-100">Paid</span> will leave these linked transactions:
+            </p>
+            <ul className="space-y-1.5">
+              {pendingStatusSave.linkedTxs.map((tx) => (
+                <li key={tx.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-700/50">
+                  <span className="text-slate-700 dark:text-slate-300">{tx.description}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(tx.amount, sym)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <button onClick={() => setPendingStatusSave(null)} type="button"
+                className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (editing) updateInvoice({ ...pendingStatusSave.data, id: editing.id });
+                  setPendingStatusSave(null);
+                  setModalOpen(false);
+                }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Keep Transactions
+              </button>
+              <button
+                onClick={() => {
+                  if (editing) {
+                    updateInvoice({ ...pendingStatusSave.data, id: editing.id });
+                    deleteTransactionsByInvoiceId(editing.id);
+                  }
+                  setPendingStatusSave(null);
+                  setModalOpen(false);
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+              >
+                Delete Transactions
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <InvoiceModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setImportData(null); }}
@@ -416,8 +465,41 @@ function InvoicesContent() {
         settings={settings}
         onSave={(data) => {
           setImportData(null);
-          if (editing) updateInvoice({ ...data, id: editing.id });
-          else addInvoice(data);
+          if (editing) {
+            const linkedTxs = transactions.filter((t) => t.invoiceId === editing.id);
+            if (editing.status === 'paid' && data.status !== 'paid' && linkedTxs.length > 0) {
+              setPendingStatusSave({ data, linkedTxs });
+              return;
+            }
+            updateInvoice({ ...data, id: editing.id });
+            if (data.status === 'paid' && editing.status !== 'paid' && linkedTxs.length === 0) {
+              const parts: string[] = [];
+              const inv = { ...data, id: editing.id } as TrackedInvoice;
+              if (inv.workBlocks?.length) {
+                parts.push(...inv.workBlocks.filter((wb) => wb.description).map((wb) => wb.description));
+              }
+              if (inv.expenses?.length) {
+                const expTotal = inv.expenses.reduce((s, e) => s + e.amount, 0);
+                if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
+              }
+              addTransaction({
+                date: data.paidDate || todayString(),
+                type: 'income',
+                amount: data.amount,
+                description: `Invoice #${data.invoiceNumber}`,
+                category: settings.incomeCategories?.[0] || 'Consulting',
+                clientId: data.clientId || null,
+                invoiceId: editing.id,
+                notes: parts.join(', '),
+                vatRate: null,
+                vatAmount: 0,
+                taxDeductible: true,
+                attachments: [],
+              });
+            }
+          } else {
+            addInvoice(data);
+          }
           setModalOpen(false);
         }}
       />

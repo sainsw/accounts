@@ -427,7 +427,7 @@ describe('Invoice CRUD & auto-transactions', () => {
     });
   });
 
-  it('updateInvoice changing status to "paid" auto-creates a transaction', async () => {
+  it('updateInvoice does not auto-create or delete transactions', async () => {
     const inv = createInvoice({ id: 'inv-1', status: 'sent' });
     seedLocalStorage({ invoices: [inv] });
     await renderAndWait(
@@ -440,11 +440,11 @@ describe('Invoice CRUD & auto-transactions', () => {
     );
     fireEvent.click(screen.getByText('Mark Paid'));
     await waitFor(() =>
-      expect(screen.getByTestId('tx-count')).toHaveTextContent('1')
+      expect(screen.getByTestId('tx-count')).toHaveTextContent('0')
     );
   });
 
-  it('updateInvoice changing status from "paid" to "sent" removes the auto-created transaction', async () => {
+  it('updateInvoice changing status from "paid" to "sent" preserves linked transactions', async () => {
     const inv = createInvoice({ id: 'inv-1', status: 'paid', paidDate: '2024-06-15' });
     const tx = createTransaction({ id: 'tx-auto', invoiceId: 'inv-1', type: 'income' });
     seedLocalStorage({ invoices: [inv], transactions: [tx] });
@@ -457,25 +457,6 @@ describe('Invoice CRUD & auto-transactions', () => {
       expect(screen.getByTestId('tx-count')).toHaveTextContent('1')
     );
     fireEvent.click(screen.getByText('Mark Sent'));
-    await waitFor(() =>
-      expect(screen.getByTestId('tx-count')).toHaveTextContent('0')
-    );
-  });
-
-  it('auto-transaction deduplication: does not create duplicate for already-paid invoice', async () => {
-    const inv = createInvoice({ id: 'inv-1', status: 'paid', paidDate: '2024-06-15' });
-    const tx = createTransaction({ id: 'tx-existing', invoiceId: 'inv-1' });
-    seedLocalStorage({ invoices: [inv], transactions: [tx] });
-    await renderAndWait(
-      <AppProvider>
-        <InvoiceActions />
-      </AppProvider>
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId('tx-count')).toHaveTextContent('1')
-    );
-    // Updating the invoice (still paid) should not create another transaction
-    fireEvent.click(screen.getByText('Mark Paid'));
     await waitFor(() =>
       expect(screen.getByTestId('tx-count')).toHaveTextContent('1')
     );
