@@ -1,13 +1,13 @@
 import { generateInvoicePdf, formatISODate } from '@sainsw/invoice-pdf';
 import type { PdfInput, Settings as PdfSettings, Expense as PdfExpense, WorkBlock as PdfWorkBlock } from '@sainsw/invoice-pdf';
-import type { TrackedInvoice, Settings, Client } from './types';
+import type { TrackedInvoice, Settings, Client, Attachment } from './types';
 import { computeInvoiceTotals } from './invoice-utils';
 
-export function downloadInvoicePdf(
+function buildPdfInput(
   invoice: TrackedInvoice,
   settings: Settings,
   client?: Client,
-) {
+): PdfInput {
   const clientAddress = client?.address ?? '';
   const monthKey = invoice.issueDate.slice(0, 7);
   const inv = settings.invoicing || {};
@@ -54,7 +54,7 @@ export function downloadInvoicePdf(
       notes: ex.notes,
     }));
 
-    const pdfInput: PdfInput = {
+    return {
       settings: pdfSettings,
       invoice: {
         invoiceMonth: monthKey,
@@ -78,9 +78,8 @@ export function downloadInvoicePdf(
         total: totals.total,
       },
     };
-    generateInvoicePdf(pdfInput);
   } else {
-    const pdfInput: PdfInput = {
+    return {
       settings: pdfSettings,
       invoice: {
         invoiceMonth: monthKey,
@@ -118,6 +117,25 @@ export function downloadInvoicePdf(
         total: invoice.amount,
       },
     };
-    generateInvoicePdf(pdfInput);
   }
+}
+
+export function downloadInvoicePdf(
+  invoice: TrackedInvoice,
+  settings: Settings,
+  client?: Client,
+): { filename: string; dataUri: string } {
+  const pdfInput = buildPdfInput(invoice, settings, client);
+  return generateInvoicePdf(pdfInput);
+}
+
+export function getInvoicePdfAttachment(
+  invoice: TrackedInvoice,
+  settings: Settings,
+  client?: Client,
+): Attachment {
+  const pdfInput = buildPdfInput(invoice, settings, client);
+  const { filename, dataUri } = generateInvoicePdf({ ...pdfInput, skipDownload: true });
+  const base64 = dataUri.replace(/^data:[^;]+;[^,]*,/, '');
+  return { id: `pdf-${invoice.id}`, name: filename, data: `data:application/pdf;base64,${base64}` };
 }

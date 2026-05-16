@@ -392,7 +392,7 @@ describe('Invoice CRUD & auto-transactions', () => {
     );
   });
 
-  it('addInvoice with status "paid" auto-creates an income transaction', async () => {
+  it('addInvoice with status "paid" does not auto-create a transaction', async () => {
     seedLocalStorage({});
     await renderAndWait(
       <AppProvider>
@@ -405,12 +405,8 @@ describe('Invoice CRUD & auto-transactions', () => {
     fireEvent.click(screen.getByText('Add Paid Invoice'));
     await waitFor(() => {
       expect(screen.getByTestId('invoice-count')).toHaveTextContent('1');
-      expect(screen.getByTestId('tx-count')).toHaveTextContent('1');
+      expect(screen.getByTestId('tx-count')).toHaveTextContent('0');
     });
-    // Verify the auto-created transaction is income
-    const txJson = JSON.parse(screen.getByTestId('tx-json').textContent!);
-    expect(txJson[0].type).toBe('income');
-    expect(txJson[0].amount).toBe(1000);
   });
 
   it('addInvoice with status "draft" does not create a transaction', async () => {

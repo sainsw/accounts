@@ -53,7 +53,7 @@ type AppContextValue = {
   deleteClient: (id: string) => void;
 
   invoices: TrackedInvoice[];
-  addInvoice: (i: Omit<TrackedInvoice, 'id'>) => void;
+  addInvoice: (i: Omit<TrackedInvoice, 'id'>) => string;
   updateInvoice: (i: TrackedInvoice) => void;
   deleteInvoice: (id: string) => void;
   deleteTransactionsByInvoiceId: (invoiceId: string) => void;
@@ -135,27 +135,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (i: Omit<TrackedInvoice, 'id'>) => {
       const invoiceId = generateId();
       invoiceState.setValue((prev) => [{ ...i, id: invoiceId }, ...prev]);
-
-      if (i.status === 'paid') {
-        const tx: Transaction = {
-          id: generateId(),
-          date: i.paidDate || todayString(),
-          type: 'income',
-          amount: i.amount,
-          description: `Invoice ${i.invoiceNumber} — ${i.clientName}`,
-          category: 'Consulting',
-          clientId: i.clientId,
-          invoiceId,
-          notes: '',
-          vatRate: null,
-          vatAmount: 0,
-          taxDeductible: true,
-          attachments: [],
-        };
-        txState.setValue((prev) => [tx, ...prev]);
-      }
+      return invoiceId;
     },
-    [invoiceState, txState]
+    [invoiceState]
   );
 
   const updateInvoice = useCallback(

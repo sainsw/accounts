@@ -6,7 +6,7 @@ import { cn, todayString } from '@/lib/utils';
 import { parseInvoicePdfs, type ParsedInvoice } from '@/lib/pdf-import';
 import type { TrackedInvoice } from '@/lib/types';
 
-type ImportedInvoice = Omit<TrackedInvoice, 'id'>;
+export type ImportedInvoice = Omit<TrackedInvoice, 'id'> & { pdfData?: string };
 
 type Props = {
   clients: { id: string; name: string }[];
@@ -34,8 +34,15 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
     const results = await parseInvoicePdfs(pdfs);
     setParsed(results);
 
+    const fileDataPromises = pdfs.map((f) => new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(f);
+    }));
+    const fileDataArr = await Promise.all(fileDataPromises);
+
     // Build initial forms from parsed data
-    const initialForms: ImportedInvoice[] = results.map((r) => ({
+    const initialForms: ImportedInvoice[] = results.map((r, i) => ({
       invoiceNumber: r.invoiceNumber,
       clientId: clients.find((c) => c.name.toLowerCase() === r.clientName.toLowerCase())?.id ?? null,
       clientName: r.clientName,
@@ -45,6 +52,7 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
       status: 'paid' as const,
       paidDate: r.issueDate || todayString(),
       notes: `Imported from ${r.fileName}`,
+      pdfData: fileDataArr[i],
     }));
 
     setForms(initialForms);

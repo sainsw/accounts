@@ -7,7 +7,7 @@ import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
 import type { TrackedInvoice, Transaction, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
-import { downloadInvoicePdf } from '@/lib/invoice-pdf-adapter';
+import { downloadInvoicePdf, getInvoicePdfAttachment } from '@/lib/invoice-pdf-adapter';
 import { computeInvoiceTotals, getWeekdays } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
 import { WorkBlocksEditor } from '@/components/WorkBlocksEditor';
@@ -182,7 +182,29 @@ function InvoicesContent() {
             clients={clients}
             existingInvoiceNumbers={invoices.map((i) => i.invoiceNumber)}
             onComplete={(imported) => {
-              for (const inv of imported) addInvoice(inv);
+              for (const inv of imported) {
+                const { pdfData, ...invoiceData } = inv;
+                const invoiceId = addInvoice(invoiceData);
+                if (inv.status === 'paid') {
+                  const attachments = pdfData
+                    ? [{ id: `pdf-${invoiceId}`, name: `${inv.invoiceNumber}.pdf`, data: pdfData }]
+                    : [];
+                  addTransaction({
+                    date: inv.paidDate || todayString(),
+                    type: 'income',
+                    amount: inv.amount,
+                    description: `Invoice #${inv.invoiceNumber}`,
+                    category: settings.incomeCategories?.[0] || 'Consulting',
+                    clientId: inv.clientId || null,
+                    invoiceId,
+                    notes: `Imported from PDF`,
+                    vatRate: null,
+                    vatAmount: 0,
+                    taxDeductible: true,
+                    attachments,
+                  });
+                }
+              }
               setShowImporter(false);
             }}
           />
@@ -335,12 +357,16 @@ function InvoicesContent() {
           if (replace || linkedTxs.length === 0) {
             const parts: string[] = [];
             if (markPaidInvoice.workBlocks?.length) {
-              parts.push(...markPaidInvoice.workBlocks.filter((wb) => wb.description).map((wb) => wb.description));
+              parts.push(...markPaidInvoice.workBlocks.filter((wb) => wb.description).map((wb) =>
+                `${wb.description} ${sym}${wb.blockTotal.toFixed(2)}`
+              ));
             }
             if (markPaidInvoice.expenses?.length) {
               const expTotal = markPaidInvoice.expenses.reduce((s, e) => s + e.amount, 0);
               if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
             }
+            const client = clients.find((c) => c.id === markPaidInvoice.clientId);
+            const attachment = getInvoicePdfAttachment(markPaidInvoice, settings, client);
             addTransaction({
               date: markPaidDate,
               type: 'income',
@@ -353,7 +379,7 @@ function InvoicesContent() {
               vatRate: null,
               vatAmount: 0,
               taxDeductible: true,
-              attachments: [],
+              attachments: [attachment],
             });
           }
           setMarkPaidInvoice(null);
@@ -477,12 +503,16 @@ function InvoicesContent() {
               const parts: string[] = [];
               const inv = { ...data, id: editing.id } as TrackedInvoice;
               if (inv.workBlocks?.length) {
-                parts.push(...inv.workBlocks.filter((wb) => wb.description).map((wb) => wb.description));
+                parts.push(...inv.workBlocks.filter((wb) => wb.description).map((wb) =>
+                  `${wb.description} ${sym}${wb.blockTotal.toFixed(2)}`
+                ));
               }
               if (inv.expenses?.length) {
                 const expTotal = inv.expenses.reduce((s, e) => s + e.amount, 0);
                 if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
               }
+              const client = clients.find((c) => c.id === data.clientId);
+              const attachment = getInvoicePdfAttachment(inv, settings, client);
               addTransaction({
                 date: data.paidDate || todayString(),
                 type: 'income',
@@ -495,7 +525,7 @@ function InvoicesContent() {
                 vatRate: null,
                 vatAmount: 0,
                 taxDeductible: true,
-                attachments: [],
+                attachments: [attachment],
               });
             }
           } else {
