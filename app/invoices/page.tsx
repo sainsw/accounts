@@ -345,7 +345,7 @@ function InvoicesContent() {
               type: 'income',
               amount: markPaidInvoice.amount,
               description: `Invoice #${markPaidInvoice.invoiceNumber}`,
-              category: settings.invoicing?.incomeCategory || settings.incomeCategories?.[0] || 'Consulting',
+              category: settings.incomeCategories?.[0] || 'Consulting',
               clientId: markPaidInvoice.clientId || null,
               invoiceId: markPaidInvoice.id,
               notes: parts.join(', '),
