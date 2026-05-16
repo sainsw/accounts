@@ -501,7 +501,7 @@ function TransactionModal({
             <div className="mt-2 flex flex-wrap gap-2">
               {form.attachments.map((a) => (
                 <span key={a.id} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs dark:bg-slate-700">
-                  {a.name}
+                  <a href={a.data} download={a.name} className="text-brand-600 underline hover:text-brand-700 dark:text-brand-400">{a.name}</a>
                   <button type="button" onClick={() => removeAttachment(a.id)} className="text-red-400 hover:text-red-600">&times;</button>
                 </span>
               ))}
