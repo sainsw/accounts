@@ -63,7 +63,7 @@ export default function InvoicesPage() {
 }
 
 function InvoicesContent() {
-  const { ready, settings, invoices, clients, transactions, addInvoice, updateInvoice, deleteInvoice, deleteTransactionsByInvoiceId } = useApp();
+  const { ready, settings, invoices, clients, transactions, addInvoice, updateInvoice, deleteInvoice, addTransaction, deleteTransactionsByInvoiceId } = useApp();
   const [confirmDeleteInvoice, setConfirmDeleteInvoice] = useState<TrackedInvoice | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TrackedInvoice | null>(null);
@@ -330,6 +330,36 @@ function InvoicesContent() {
               onClick={() => {
                 if (markPaidInvoice) {
                   updateInvoice({ ...markPaidInvoice, status: 'paid', paidDate: markPaidDate });
+                  const hasLinkedTx = transactions.some((t) => t.invoiceId === markPaidInvoice.id);
+                  if (!hasLinkedTx) {
+                    const parts: string[] = [];
+                    if (markPaidInvoice.workBlocks?.length) {
+                      parts.push(...markPaidInvoice.workBlocks
+                        .filter((wb) => wb.description)
+                        .map((wb) => wb.description));
+                    }
+                    if (markPaidInvoice.expenses?.length) {
+                      const expTotal = markPaidInvoice.expenses.reduce((s, e) => s + e.amount, 0);
+                      if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
+                    }
+                    const desc = parts.length > 0
+                      ? `Invoice #${markPaidInvoice.invoiceNumber}: ${parts.join(', ')}`
+                      : `Invoice #${markPaidInvoice.invoiceNumber}`;
+                    addTransaction({
+                      date: markPaidDate,
+                      type: 'income',
+                      amount: markPaidInvoice.amount,
+                      description: desc,
+                      category: settings.incomeCategories?.[0] || 'Consulting',
+                      clientId: markPaidInvoice.clientId || null,
+                      invoiceId: markPaidInvoice.id,
+                      notes: '',
+                      vatRate: null,
+                      vatAmount: 0,
+                      taxDeductible: true,
+                      attachments: [],
+                    });
+                  }
                   setMarkPaidInvoice(null);
                 }
               }}
