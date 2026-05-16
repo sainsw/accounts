@@ -311,11 +311,27 @@ function InvoicesContent() {
       )}
 
       {/* Mark as Paid modal */}
-      <Modal open={!!markPaidInvoice} onClose={() => { setMarkPaidInvoice(null); setConfirmReplaceTx(false); }} title="Mark as Paid">
-        {(() => {
-          if (!markPaidInvoice) return null;
+      <MarkPaidModal
+        invoice={markPaidInvoice}
+        transactions={transactions}
+        settings={settings}
+        sym={sym}
+        date={markPaidDate}
+        onDateChange={setMarkPaidDate}
+        showReplace={confirmReplaceTx}
+        onClose={() => { setMarkPaidInvoice(null); setConfirmReplaceTx(false); }}
+        onConfirm={(replace) => {
+          if (!markPaidInvoice) return;
           const linkedTxs = transactions.filter((t) => t.invoiceId === markPaidInvoice.id);
-          const buildNotes = () => {
+          if (!confirmReplaceTx && linkedTxs.length > 0) {
+            setConfirmReplaceTx(true);
+            return;
+          }
+          updateInvoice({ ...markPaidInvoice, status: 'paid', paidDate: markPaidDate });
+          if (replace) {
+            deleteTransactionsByInvoiceId(markPaidInvoice.id);
+          }
+          if (replace || linkedTxs.length === 0) {
             const parts: string[] = [];
             if (markPaidInvoice.workBlocks?.length) {
               parts.push(...markPaidInvoice.workBlocks.filter((wb) => wb.description).map((wb) => wb.description));
@@ -324,105 +340,25 @@ function InvoicesContent() {
               const expTotal = markPaidInvoice.expenses.reduce((s, e) => s + e.amount, 0);
               if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
             }
-            return parts.join(', ');
-          };
-          const createTx = () => {
             addTransaction({
               date: markPaidDate,
               type: 'income',
               amount: markPaidInvoice.amount,
               description: `Invoice #${markPaidInvoice.invoiceNumber}`,
-              category: settings.incomeCategories?.[0] || 'Consulting',
+              category: settings.invoicing?.incomeCategory || settings.incomeCategories?.[0] || 'Consulting',
               clientId: markPaidInvoice.clientId || null,
               invoiceId: markPaidInvoice.id,
-              notes: buildNotes(),
+              notes: parts.join(', '),
               vatRate: null,
               vatAmount: 0,
               taxDeductible: true,
               attachments: [],
             });
-          };
-          const markPaid = (replaceTx: boolean) => {
-            updateInvoice({ ...markPaidInvoice, status: 'paid', paidDate: markPaidDate });
-            if (replaceTx) {
-              deleteTransactionsByInvoiceId(markPaidInvoice.id);
-              createTx();
-            } else if (linkedTxs.length === 0) {
-              createTx();
-            }
-            setMarkPaidInvoice(null);
-            setConfirmReplaceTx(false);
-          };
-
-          if (confirmReplaceTx) {
-            return (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  This invoice has {linkedTxs.length} linked transaction{linkedTxs.length > 1 ? 's' : ''}:
-                </p>
-                <div className="space-y-1">
-                  {linkedTxs.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-700/50">
-                      <span className="text-slate-700 dark:text-slate-300">{tx.description || 'No description'}</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{formatCurrency(tx.amount, sym)}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Replace with a new transaction from the invoice, or keep existing?
-                </p>
-                <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-                  <button onClick={() => { setMarkPaidInvoice(null); setConfirmReplaceTx(false); }} type="button"
-                    className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-                    Cancel
-                  </button>
-                  <button onClick={() => markPaid(false)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
-                    Keep existing
-                  </button>
-                  <button onClick={() => markPaid(true)}
-                    className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600">
-                    Replace
-                  </button>
-                </div>
-              </div>
-            );
           }
-
-          return (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Invoice <span className="font-medium text-slate-900 dark:text-slate-100">#{markPaidInvoice.invoiceNumber}</span> — {formatCurrency(markPaidInvoice.amount, sym)}
-              </p>
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
-                <span className="ml-1 text-xs text-slate-400">(used for tax year)</span>
-                <input type="date" value={markPaidDate} onChange={(e) => setMarkPaidDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
-              </label>
-              <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
-                <button onClick={() => setMarkPaidInvoice(null)} type="button"
-                  className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (linkedTxs.length > 0) {
-                      setConfirmReplaceTx(true);
-                    } else {
-                      markPaid(false);
-                    }
-                  }}
-                  disabled={!markPaidDate}
-                  className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  Confirm Paid
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
+          setMarkPaidInvoice(null);
+          setConfirmReplaceTx(false);
+        }}
+      />
 
       {/* Delete invoice confirmation */}
       <Modal open={!!confirmDeleteInvoice} onClose={() => setConfirmDeleteInvoice(null)} title="Delete Invoice">
@@ -831,6 +767,84 @@ function InvoiceModal({
           </div>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function MarkPaidModal({
+  invoice, transactions, settings, sym, date, onDateChange, showReplace, onClose, onConfirm,
+}: {
+  invoice: TrackedInvoice | null;
+  transactions: import('@/lib/types').Transaction[];
+  settings: import('@/lib/types').Settings;
+  sym: string;
+  date: string;
+  onDateChange: (d: string) => void;
+  showReplace: boolean;
+  onClose: () => void;
+  onConfirm: (replace: boolean) => void;
+}) {
+  const linkedTxs = invoice ? transactions.filter((t) => t.invoiceId === invoice.id) : [];
+
+  return (
+    <Modal open={!!invoice} onClose={onClose} title="Mark as Paid">
+      {showReplace ? (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            This invoice has {linkedTxs.length} linked transaction{linkedTxs.length > 1 ? 's' : ''}:
+          </p>
+          <div className="space-y-1">
+            {linkedTxs.map((tx) => (
+              <div key={tx.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-700/50">
+                <span className="text-slate-700 dark:text-slate-300">{tx.description || 'No description'}</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{formatCurrency(tx.amount, sym)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Replace with a new transaction from the invoice, or keep existing?
+          </p>
+          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <button onClick={onClose} type="button"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+              Cancel
+            </button>
+            <button onClick={() => onConfirm(false)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
+              Keep existing
+            </button>
+            <button onClick={() => onConfirm(true)}
+              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600">
+              Replace
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Invoice <span className="font-medium text-slate-900 dark:text-slate-100">#{invoice?.invoiceNumber}</span> — {formatCurrency(invoice?.amount ?? 0, sym)}
+          </p>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
+            <span className="ml-1 text-xs text-slate-400">(used for tax year)</span>
+            <input type="date" value={date} onChange={(e) => onDateChange(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+          </label>
+          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <button onClick={onClose} type="button"
+              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm(false)}
+              disabled={!date}
+              className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              Confirm Paid
+            </button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
