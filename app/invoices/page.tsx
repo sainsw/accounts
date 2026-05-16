@@ -6,8 +6,9 @@ import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
-import type { TrackedInvoice } from '@/lib/types';
+import type { TrackedInvoice, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-adapter';
+import { computeInvoiceTotals } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
 
 const PdfImportWizard = dynamic(() => import('@/components/PdfImportWizard'), { ssr: false });
@@ -39,6 +40,17 @@ const STATUS_COLORS: Record<TrackedInvoice['status'], string> = {
   paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
   overdue: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
 };
+
+let nextId = 1;
+function uid() { return `tmp-${nextId++}-${Date.now()}`; }
+
+function newWorkBlock(dailyRate: number): InvoiceWorkBlock {
+  return { id: uid(), description: '', startDate: todayString(), endDate: todayString(), billingMode: 'daily', dailyRate, blockTotal: 0 };
+}
+
+function newExpense(): InvoiceExpense {
+  return { id: uid(), date: todayString(), notes: '', amount: 0 };
+}
 
 export default function InvoicesPage() {
   return (
@@ -82,8 +94,16 @@ function InvoicesContent() {
         amount: data.amount || 0,
         status: data.status || 'sent',
         paidDate: null,
-        notes: '',
+        notes: data.notes || '',
+        workBlocks: data.workBlocks || undefined,
+        expenses: data.expenses || undefined,
+        taxRate: data.taxRate ?? undefined,
+        purchaseOrder: data.purchaseOrder || undefined,
       };
+      if (prefilled.workBlocks?.length || prefilled.expenses?.length) {
+        const totals = computeInvoiceTotals(prefilled.workBlocks || [], prefilled.expenses || [], prefilled.taxRate || 0);
+        prefilled.amount = totals.total;
+      }
       setImportData(prefilled);
       setEditing(null);
       setModalOpen(true);
@@ -116,8 +136,8 @@ function InvoicesContent() {
 
   const sym = settings.currencySymbol || '$';
 
-  const openNew = useCallback(() => { setEditing(null); setModalOpen(true); }, []);
-  const openEdit = useCallback((i: TrackedInvoice) => { setEditing(i); setModalOpen(true); }, []);
+  const openNew = useCallback(() => { setEditing(null); setImportData(null); setModalOpen(true); }, []);
+  const openEdit = useCallback((i: TrackedInvoice) => { setEditing(i); setImportData(null); setModalOpen(true); }, []);
 
   const [markPaidInvoice, setMarkPaidInvoice] = useState<TrackedInvoice | null>(null);
   const [markPaidDate, setMarkPaidDate] = useState(todayString());
@@ -217,9 +237,19 @@ function InvoicesContent() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                 {filtered.map((inv) => {
                   const crossesBoundary = crossesTaxYear(inv);
+                  const hasLineItems = (inv.workBlocks?.length ?? 0) > 0 || (inv.expenses?.length ?? 0) > 0;
                   return (
                     <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openEdit(inv)}>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          {inv.invoiceNumber}
+                          {hasLineItems && (
+                            <span className="inline-flex rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                              Itemized
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{inv.clientName}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(inv.issueDate, locale)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{inv.dueDate ? formatDate(inv.dueDate, locale) : '—'}</td>
@@ -241,17 +271,6 @@ function InvoicesContent() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const client = clients.find((c) => c.id === inv.clientId);
-                              downloadInvoicePdf(inv, settings, client);
-                            }}
-                            className="rounded p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-500/10"
-                            title="Download PDF"
-                          >
-                            <DownloadIcon />
-                          </button>
                           {(inv.status === 'sent' || inv.status === 'overdue') && (
                             <button
                               onClick={(e) => {
@@ -406,16 +425,20 @@ function InvoiceModal({
   onSave: (data: FormData) => void;
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [itemized, setItemized] = useState(false);
 
   useMemo(() => {
     if (open) {
       if (importData) {
         setForm(importData);
+        setItemized(!!(importData.workBlocks?.length || importData.expenses?.length));
       } else if (editing) {
         const { id: _, ...rest } = editing;
         setForm(rest);
+        setItemized(!!(rest.workBlocks?.length || rest.expenses?.length));
       } else {
         setForm(emptyForm());
+        setItemized(false);
       }
     }
   }, [open, editing, importData]);
@@ -423,27 +446,66 @@ function InvoiceModal({
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.invoiceNumber || !form.clientName || !form.amount) return;
-    onSave(form);
+  const workBlocks = form.workBlocks || [];
+  const expenses = form.expenses || [];
+  const taxRate = form.taxRate || 0;
+
+  const totals = useMemo(
+    () => itemized ? computeInvoiceTotals(workBlocks, expenses, taxRate) : null,
+    [itemized, workBlocks, expenses, taxRate]
+  );
+
+  const setWorkBlock = (id: string, patch: Partial<InvoiceWorkBlock>) => {
+    set('workBlocks', workBlocks.map((wb) => wb.id === id ? { ...wb, ...patch } : wb));
   };
 
+  const setExpense = (id: string, patch: Partial<InvoiceExpense>) => {
+    set('expenses', expenses.map((ex) => ex.id === id ? { ...ex, ...patch } : ex));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalForm = { ...form };
+    if (itemized && totals) {
+      finalForm.amount = totals.total;
+    }
+    if (!finalForm.invoiceNumber || !finalForm.clientName || !finalForm.amount) return;
+    if (!itemized) {
+      delete finalForm.workBlocks;
+      delete finalForm.expenses;
+      delete finalForm.taxRate;
+      delete finalForm.purchaseOrder;
+    }
+    onSave(finalForm);
+  };
+
+  const defaultRate = settings.invoicing?.defaultDailyRate || 0;
+
+  const inputCls = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
+  const inputSmCls = "w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
+
   return (
-    <Modal open={open} onClose={onClose} title={importData ? 'Import from Invoicer' : editing ? 'Edit Invoice' : 'Track Invoice'}>
+    <Modal open={open} onClose={onClose} title={importData ? 'Import from Invoicer' : editing ? 'Edit Invoice' : 'Track Invoice'} wide={itemized}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice # *</span>
             <input type="text" value={form.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
-              placeholder="INV-001" />
+              className={inputCls} placeholder="INV-001" />
           </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({sym}) *</span>
-            <input type="number" step="0.01" min="0" value={form.amount || ''} onChange={(e) => set('amount', parseFloat(e.target.value) || 0)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
-          </label>
+          {!itemized ? (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({sym}) *</span>
+              <input type="number" step="0.01" min="0" value={form.amount || ''} onChange={(e) => set('amount', parseFloat(e.target.value) || 0)}
+                className={inputCls} />
+            </label>
+          ) : (
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PO Number</span>
+              <input type="text" value={form.purchaseOrder || ''} onChange={(e) => set('purchaseOrder', e.target.value)}
+                className={inputCls} placeholder="Optional" />
+            </label>
+          )}
         </div>
 
         <label className="block">
@@ -456,33 +518,191 @@ function InvoiceModal({
                 set('clientId', c?.id ?? null);
                 if (c) set('clientName', c.name);
               }}
-              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
+              className={"flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"}
             >
               <option value="">Select or type name</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <input type="text" value={form.clientName} onChange={(e) => set('clientName', e.target.value)} placeholder="Client name"
-              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+              className={"flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"} />
           </div>
         </label>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
-            <input type="date" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+            <input type="date" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)} className={inputCls} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Due Date</span>
-            <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+            <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className={inputCls} />
           </label>
         </div>
+
+        {/* Itemized toggle */}
+        <div className="flex items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={itemized}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setItemized(on);
+                if (on && !workBlocks.length) {
+                  set('workBlocks', [newWorkBlock(defaultRate)]);
+                }
+              }}
+              className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Itemized invoice</span>
+          </label>
+          <span className="text-xs text-slate-400">Add work blocks &amp; expenses</span>
+        </div>
+
+        {itemized && (
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/30">
+            {/* Work Blocks */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Work Blocks</h3>
+                <button type="button" onClick={() => set('workBlocks', [...workBlocks, newWorkBlock(defaultRate)])}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10">
+                  <PlusIcon /> Add
+                </button>
+              </div>
+              {workBlocks.length === 0 && (
+                <p className="text-xs text-slate-400">No work blocks yet</p>
+              )}
+              <div className="space-y-2">
+                {workBlocks.map((wb) => (
+                  <div key={wb.id} className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-end gap-2 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
+                    <label className="block">
+                      <span className="text-[10px] font-medium text-slate-500">Description</span>
+                      <input type="text" value={wb.description} onChange={(e) => setWorkBlock(wb.id, { description: e.target.value })}
+                        className={inputSmCls} placeholder="Service description" />
+                    </label>
+                    <label className="block w-28">
+                      <span className="text-[10px] font-medium text-slate-500">Start</span>
+                      <input type="date" value={wb.startDate} onChange={(e) => setWorkBlock(wb.id, { startDate: e.target.value })}
+                        className={inputSmCls} />
+                    </label>
+                    <label className="block w-28">
+                      <span className="text-[10px] font-medium text-slate-500">End</span>
+                      <input type="date" value={wb.endDate} onChange={(e) => setWorkBlock(wb.id, { endDate: e.target.value })}
+                        className={inputSmCls} />
+                    </label>
+                    <label className="block w-20">
+                      <span className="text-[10px] font-medium text-slate-500">Mode</span>
+                      <select value={wb.billingMode} onChange={(e) => setWorkBlock(wb.id, { billingMode: e.target.value as 'daily' | 'block' })}
+                        className={inputSmCls}>
+                        <option value="daily">Daily</option>
+                        <option value="block">Block</option>
+                      </select>
+                    </label>
+                    <label className="block w-24">
+                      <span className="text-[10px] font-medium text-slate-500">
+                        {wb.billingMode === 'daily' ? `Rate (${sym})` : `Total (${sym})`}
+                      </span>
+                      <input type="number" step="0.01" min="0"
+                        value={wb.billingMode === 'daily' ? (wb.dailyRate || '') : (wb.blockTotal || '')}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value) || 0;
+                          if (wb.billingMode === 'daily') setWorkBlock(wb.id, { dailyRate: v });
+                          else setWorkBlock(wb.id, { blockTotal: v });
+                        }}
+                        className={inputSmCls} />
+                    </label>
+                    <button type="button" onClick={() => set('workBlocks', workBlocks.filter((w) => w.id !== wb.id))}
+                      className="mb-0.5 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                      <TrashIcon />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Expenses */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Expenses</h3>
+                <button type="button" onClick={() => set('expenses', [...expenses, newExpense()])}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10">
+                  <PlusIcon /> Add
+                </button>
+              </div>
+              {expenses.length === 0 && (
+                <p className="text-xs text-slate-400">No expenses</p>
+              )}
+              <div className="space-y-2">
+                {expenses.map((ex) => (
+                  <div key={ex.id} className="grid grid-cols-[auto_1fr_auto_auto] items-end gap-2 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
+                    <label className="block w-32">
+                      <span className="text-[10px] font-medium text-slate-500">Date</span>
+                      <input type="date" value={ex.date} onChange={(e) => setExpense(ex.id, { date: e.target.value })}
+                        className={inputSmCls} />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-medium text-slate-500">Notes</span>
+                      <input type="text" value={ex.notes} onChange={(e) => setExpense(ex.id, { notes: e.target.value })}
+                        className={inputSmCls} placeholder="Expense description" />
+                    </label>
+                    <label className="block w-24">
+                      <span className="text-[10px] font-medium text-slate-500">Amount ({sym})</span>
+                      <input type="number" step="0.01" min="0" value={ex.amount || ''} onChange={(e) => setExpense(ex.id, { amount: parseFloat(e.target.value) || 0 })}
+                        className={inputSmCls} />
+                    </label>
+                    <button type="button" onClick={() => set('expenses', expenses.filter((e2) => e2.id !== ex.id))}
+                      className="mb-0.5 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                      <TrashIcon />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tax */}
+            <div className="flex items-center gap-3">
+              <label className="block w-28">
+                <span className="text-[10px] font-medium text-slate-500">Tax Rate (%)</span>
+                <input type="number" step="0.01" min="0" max="100" value={taxRate || ''} onChange={(e) => set('taxRate', parseFloat(e.target.value) || 0)}
+                  className={inputSmCls} />
+              </label>
+            </div>
+
+            {/* Totals */}
+            {totals && (
+              <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+                <div className="space-y-1 text-right text-sm">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Work subtotal</span>
+                    <span>{formatCurrency(totals.workSubtotal, sym)}</span>
+                  </div>
+                  {totals.expensesSubtotal > 0 && (
+                    <div className="flex justify-between text-slate-500">
+                      <span>Expenses subtotal</span>
+                      <span>{formatCurrency(totals.expensesSubtotal, sym)}</span>
+                    </div>
+                  )}
+                  {totals.taxAmount > 0 && (
+                    <div className="flex justify-between text-slate-500">
+                      <span>Tax ({taxRate}%)</span>
+                      <span>{formatCurrency(totals.taxAmount, sym)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                    <span>Total</span>
+                    <span>{formatCurrency(totals.total, sym)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
           <select value={form.status} onChange={(e) => set('status', e.target.value as TrackedInvoice['status'])}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600">
+            className={inputCls}>
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="paid">Paid</option>
@@ -493,15 +713,13 @@ function InvoiceModal({
         {form.status === 'paid' && (
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
-            <input type="date" value={form.paidDate ?? ''} onChange={(e) => set('paidDate', e.target.value || null)}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+            <input type="date" value={form.paidDate ?? ''} onChange={(e) => set('paidDate', e.target.value || null)} className={inputCls} />
           </label>
         )}
 
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
-          <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
+          <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} className={inputCls} />
         </label>
 
         <div className="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
@@ -524,7 +742,7 @@ function InvoiceModal({
               className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
               Cancel
             </button>
-            <button type="submit" disabled={!form.invoiceNumber || !form.clientName || !form.amount}
+            <button type="submit" disabled={!form.invoiceNumber || !form.clientName || (!itemized && !form.amount) || (itemized && !!totals && !totals.total)}
               className="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-50">
               {editing ? 'Save Changes' : 'Track Invoice'}
             </button>

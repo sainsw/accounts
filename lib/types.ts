@@ -32,6 +32,42 @@ export type Client = {
   createdAt: string;
 };
 
+export type InvoiceWorkBlock = {
+  id: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  billingMode: 'daily' | 'block';
+  dailyRate: number;
+  blockTotal: number;
+};
+
+export type InvoiceExpense = {
+  id: string;
+  date: string;
+  notes: string;
+  amount: number;
+};
+
+export type ExtraReference = {
+  id: string;
+  label: string;
+  value: string;
+  showAtTop: boolean;
+  showAtBottom: boolean;
+};
+
+export type InvoicingSettings = {
+  bankDetails: string;
+  defaultDailyRate: number;
+  defaultPaymentTerms: number;
+  defaultNotes: string;
+  headerColor: string;
+  bodyColor: string;
+  filenameTemplate: string;
+  extraReferences: ExtraReference[];
+};
+
 export type TrackedInvoice = {
   id: string;
   invoiceNumber: string;
@@ -43,6 +79,10 @@ export type TrackedInvoice = {
   status: 'draft' | 'sent' | 'paid' | 'overdue';
   paidDate: string | null;
   notes: string;
+  workBlocks?: InvoiceWorkBlock[];
+  expenses?: InvoiceExpense[];
+  taxRate?: number;
+  purchaseOrder?: string;
 };
 
 export type TaxMode = 'flat' | 'uk-sole-trader';
@@ -82,6 +122,7 @@ export type Settings = {
   studentLoanPlan: StudentLoanPlan;
   accountingBasis: AccountingBasis;
   lastExportDate: string | null;
+  invoicing: InvoicingSettings;
 };
 
 export type TaxBandResult = {

@@ -19,6 +19,17 @@ vi.mock('@/lib/invoice-pdf-adapter', () => ({
   downloadInvoicePdf: vi.fn(),
 }));
 
+vi.mock('@/lib/invoice-utils', () => ({
+  computeInvoiceTotals: vi.fn(() => ({
+    workSubtotal: 0,
+    expensesSubtotal: 0,
+    preTaxSubtotal: 0,
+    taxAmount: 0,
+    total: 0,
+    computed: [],
+  })),
+}));
+
 vi.mock('next/dynamic', () => ({
   default: (loader: () => Promise<any>) => {
     // Return a placeholder component for PdfImportWizard

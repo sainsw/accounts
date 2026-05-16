@@ -4,8 +4,8 @@ import { useCallback, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, PageHeader } from '@/components/Card';
 import { Button } from '@/components/Modal';
-import type { Settings } from '@/lib/types';
-import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES, UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META } from '@/lib/defaults';
+import type { Settings, InvoicingSettings, ExtraReference } from '@/lib/types';
+import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES, UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META, defaultInvoicingSettings } from '@/lib/defaults';
 import { exportTransactionsCSV, exportInvoicesCSV, downloadCsv } from '@/lib/export';
 import { todayString } from '@/lib/utils';
 
@@ -275,6 +275,9 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* Invoicing Settings */}
+        <InvoicingSettingsCard settings={settings} set={set} flash={flash} />
+
         {/* Data Management */}
         <Card>
           <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Data Management</h2>
@@ -289,6 +292,128 @@ export default function SettingsPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+function InvoicingSettingsCard({
+  settings,
+  set,
+  flash,
+}: {
+  settings: Settings;
+  set: <K extends keyof Settings>(key: K, val: Settings[K]) => void;
+  flash: () => void;
+}) {
+  const inv = settings.invoicing || defaultInvoicingSettings;
+  const setInv = <K extends keyof InvoicingSettings>(key: K, val: InvoicingSettings[K]) => {
+    set('invoicing', { ...inv, [key]: val });
+    flash();
+  };
+
+  const addRef = () => {
+    const ref: ExtraReference = { id: `ref-${Date.now()}`, label: '', value: '', showAtTop: true, showAtBottom: false };
+    setInv('extraReferences', [...inv.extraReferences, ref]);
+  };
+
+  const updateRef = (id: string, patch: Partial<ExtraReference>) => {
+    setInv('extraReferences', inv.extraReferences.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+
+  const removeRef = (id: string) => {
+    setInv('extraReferences', inv.extraReferences.filter((r) => r.id !== id));
+  };
+
+  const inputCls = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
+
+  return (
+    <Card>
+      <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Invoicing</h2>
+      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+        Defaults for PDF generation and new invoices
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Daily Rate</span>
+          <input type="number" step="0.01" min="0" value={inv.defaultDailyRate || ''} onChange={(e) => setInv('defaultDailyRate', parseFloat(e.target.value) || 0)}
+            className={inputCls} />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Payment Terms (days)</span>
+          <input type="number" min="0" value={inv.defaultPaymentTerms} onChange={(e) => setInv('defaultPaymentTerms', parseInt(e.target.value) || 0)}
+            className={inputCls} />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Bank Details</span>
+          <textarea value={inv.bankDetails} onChange={(e) => setInv('bankDetails', e.target.value)} rows={3}
+            className={inputCls} placeholder="Account name, sort code, account number..." />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Notes</span>
+          <textarea value={inv.defaultNotes} onChange={(e) => setInv('defaultNotes', e.target.value)} rows={2}
+            className={inputCls} placeholder="Pre-filled notes for new invoices" />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Header Color</span>
+          <div className="mt-1 flex items-center gap-2">
+            <input type="color" value={inv.headerColor} onChange={(e) => setInv('headerColor', e.target.value)}
+              className="h-8 w-8 cursor-pointer rounded border border-slate-300 dark:border-slate-600" />
+            <input type="text" value={inv.headerColor} onChange={(e) => setInv('headerColor', e.target.value)}
+              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
+              maxLength={7} />
+          </div>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Body Color</span>
+          <div className="mt-1 flex items-center gap-2">
+            <input type="color" value={inv.bodyColor} onChange={(e) => setInv('bodyColor', e.target.value)}
+              className="h-8 w-8 cursor-pointer rounded border border-slate-300 dark:border-slate-600" />
+            <input type="text" value={inv.bodyColor} onChange={(e) => setInv('bodyColor', e.target.value)}
+              className="flex-1 rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
+              maxLength={7} />
+          </div>
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Filename Template</span>
+          <input type="text" value={inv.filenameTemplate} onChange={(e) => setInv('filenameTemplate', e.target.value)}
+            className={inputCls} />
+          <p className="mt-1 text-xs text-slate-400">
+            Tokens: [businessname] [invoicenumber] [clientname] [issuedate] [month]
+          </p>
+        </label>
+      </div>
+
+      {/* Extra References */}
+      <div className="mt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Extra References</span>
+          <Button size="sm" variant="ghost" onClick={addRef}>Add</Button>
+        </div>
+        {inv.extraReferences.length === 0 && (
+          <p className="text-xs text-slate-400">No extra references (e.g., VAT number, PO number)</p>
+        )}
+        <div className="space-y-2">
+          {inv.extraReferences.map((ref) => (
+            <div key={ref.id} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
+              <input type="text" value={ref.label} onChange={(e) => updateRef(ref.id, { label: e.target.value })}
+                placeholder="Label" className="w-28 rounded border border-slate-300 bg-transparent px-2 py-1 text-xs dark:border-slate-600" />
+              <input type="text" value={ref.value} onChange={(e) => updateRef(ref.id, { value: e.target.value })}
+                placeholder="Value" className="flex-1 rounded border border-slate-300 bg-transparent px-2 py-1 text-xs dark:border-slate-600" />
+              <label className="flex items-center gap-1 text-[10px] text-slate-500">
+                <input type="checkbox" checked={ref.showAtTop} onChange={(e) => updateRef(ref.id, { showAtTop: e.target.checked })}
+                  className="h-3 w-3 rounded border-slate-300" />
+                Top
+              </label>
+              <label className="flex items-center gap-1 text-[10px] text-slate-500">
+                <input type="checkbox" checked={ref.showAtBottom} onChange={(e) => updateRef(ref.id, { showAtBottom: e.target.checked })}
+                  className="h-3 w-3 rounded border-slate-300" />
+                Bottom
+              </label>
+              <button onClick={() => removeRef(ref.id)} className="text-slate-400 hover:text-red-500">&times;</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }
 

@@ -1,4 +1,4 @@
-import type { Settings, CostCategoryMeta } from './types';
+import type { Settings, CostCategoryMeta, InvoicingSettings } from './types';
 
 export const DEFAULT_INCOME_CATEGORIES = [
   'Consulting',
@@ -74,6 +74,17 @@ export const DEFAULT_COST_CATEGORY_META: CostCategoryMeta[] = [
   { name: 'Other Cost', allowable: 'yes' },
 ];
 
+export const defaultInvoicingSettings: InvoicingSettings = {
+  bankDetails: '',
+  defaultDailyRate: 0,
+  defaultPaymentTerms: 30,
+  defaultNotes: '',
+  headerColor: '#ffffff',
+  bodyColor: '#ffffff',
+  filenameTemplate: '[businessname]-[issuedate]-[invoicenumber]',
+  extraReferences: [],
+};
+
 export const defaultSettings: Settings = {
   businessName: '',
   businessAddress: '',
@@ -95,6 +106,7 @@ export const defaultSettings: Settings = {
   studentLoanPlan: 'none',
   accountingBasis: 'cash',
   lastExportDate: null,
+  invoicing: defaultInvoicingSettings,
 };
 
 export const STORAGE_KEYS = {
