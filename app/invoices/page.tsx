@@ -436,6 +436,18 @@ function InvoiceModal({
         setItemized(!!(importData.workBlocks?.length || importData.expenses?.length));
       } else if (editing) {
         const { id: _, ...rest } = editing;
+        if (rest.workBlocks?.length) {
+          rest.workBlocks = rest.workBlocks.map((wb) => {
+            const days = getWeekdays(wb.startDate, wb.endDate);
+            if (wb.billingMode === 'daily' && wb.dailyRate > 0) {
+              return { ...wb, blockTotal: Math.round(wb.dailyRate * days * 100) / 100 };
+            }
+            if (wb.billingMode === 'block' && wb.blockTotal > 0 && days > 0) {
+              return { ...wb, dailyRate: Math.round(wb.blockTotal / days * 10000) / 10000 };
+            }
+            return wb;
+          });
+        }
         setForm(rest);
         setItemized(!!(rest.workBlocks?.length || rest.expenses?.length));
       } else {
@@ -633,6 +645,10 @@ function InvoiceModal({
                   inputCls={inputCls}
                   onChange={setExpense}
                   onRemove={(id) => set('expenses', expenses.filter((e2) => e2.id !== id))}
+                  onDuplicate={(id) => {
+                    const ex = expenses.find((e) => e.id === id);
+                    if (ex) set('expenses', [...expenses, { ...ex, id: uid() }]);
+                  }}
                   onReorder={(ids) => {
                     const map = new Map(expenses.map((e) => [e.id, e]));
                     set('expenses', ids.map((id) => map.get(id)!));
@@ -709,8 +725,11 @@ function InvoiceModal({
               <button
                 type="button"
                 onClick={() => {
+                  const finalForm = { ...form };
+                  if (itemized && totals) finalForm.amount = totals.total;
+                  onSave(finalForm);
                   const client = clients.find((c) => c.id === editing.clientId);
-                  downloadInvoicePdf(editing, settings, client);
+                  downloadInvoicePdf({ ...finalForm, id: editing.id } as TrackedInvoice, settings, client);
                 }}
                 className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
               >
