@@ -35,6 +35,10 @@ input[type='month'] {
   min-width: 0;
 }
 
+select {
+  line-height: 1.25rem;
+}
+
 @supports (-webkit-touch-callout: none) {
   input,
   textarea,

@@ -8,7 +8,7 @@ import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
 import type { TrackedInvoice, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
 import { downloadInvoicePdf } from '@/lib/invoice-pdf-adapter';
-import { computeInvoiceTotals } from '@/lib/invoice-utils';
+import { computeInvoiceTotals, getWeekdays } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
 
 const PdfImportWizard = dynamic(() => import('@/components/PdfImportWizard'), { ssr: false });
@@ -456,7 +456,27 @@ function InvoiceModal({
   );
 
   const setWorkBlock = (id: string, patch: Partial<InvoiceWorkBlock>) => {
-    set('workBlocks', workBlocks.map((wb) => wb.id === id ? { ...wb, ...patch } : wb));
+    set('workBlocks', workBlocks.map((wb) => {
+      if (wb.id !== id) return wb;
+      const merged = { ...wb, ...patch };
+      const days = getWeekdays(merged.startDate, merged.endDate);
+      const isDailyEdit = 'dailyRate' in patch && !('blockTotal' in patch);
+      const isBlockEdit = 'blockTotal' in patch && !('dailyRate' in patch);
+      const isDateEdit = 'startDate' in patch || 'endDate' in patch;
+      if (isDailyEdit) {
+        const rate = Math.max(0, merged.dailyRate);
+        return { ...merged, dailyRate: rate, billingMode: 'daily' as const, blockTotal: Math.round(rate * days * 100) / 100 };
+      }
+      if (isBlockEdit) {
+        const total = Math.max(0, merged.blockTotal);
+        return { ...merged, blockTotal: total, billingMode: 'block' as const, dailyRate: days > 0 ? Math.round(total / days * 10000) / 10000 : 0 };
+      }
+      if (isDateEdit) {
+        const rate = Math.max(0, merged.dailyRate);
+        return { ...merged, dailyRate: rate, blockTotal: Math.round(rate * days * 100) / 100 };
+      }
+      return merged;
+    }));
   };
 
   const setExpense = (id: string, patch: Partial<InvoiceExpense>) => {
@@ -574,50 +594,56 @@ function InvoiceModal({
                 <p className="text-xs text-slate-400">No work blocks yet</p>
               )}
               <div className="space-y-2">
-                {workBlocks.map((wb) => (
-                  <div key={wb.id} className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-end gap-2 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
-                    <label className="block">
-                      <span className="text-[10px] font-medium text-slate-500">Description</span>
-                      <input type="text" value={wb.description} onChange={(e) => setWorkBlock(wb.id, { description: e.target.value })}
-                        className={inputSmCls} placeholder="Service description" />
-                    </label>
-                    <label className="block w-28">
-                      <span className="text-[10px] font-medium text-slate-500">Start</span>
-                      <input type="date" value={wb.startDate} onChange={(e) => setWorkBlock(wb.id, { startDate: e.target.value })}
-                        className={inputSmCls} />
-                    </label>
-                    <label className="block w-28">
-                      <span className="text-[10px] font-medium text-slate-500">End</span>
-                      <input type="date" value={wb.endDate} onChange={(e) => setWorkBlock(wb.id, { endDate: e.target.value })}
-                        className={inputSmCls} />
-                    </label>
-                    <label className="block w-20">
-                      <span className="text-[10px] font-medium text-slate-500">Mode</span>
-                      <select value={wb.billingMode} onChange={(e) => setWorkBlock(wb.id, { billingMode: e.target.value as 'daily' | 'block' })}
-                        className={inputSmCls}>
-                        <option value="daily">Daily</option>
-                        <option value="block">Block</option>
-                      </select>
-                    </label>
-                    <label className="block w-24">
-                      <span className="text-[10px] font-medium text-slate-500">
-                        {wb.billingMode === 'daily' ? `Rate (${sym})` : `Total (${sym})`}
-                      </span>
-                      <input type="number" step="0.01" min="0"
-                        value={wb.billingMode === 'daily' ? (wb.dailyRate || '') : (wb.blockTotal || '')}
-                        onChange={(e) => {
-                          const v = parseFloat(e.target.value) || 0;
-                          if (wb.billingMode === 'daily') setWorkBlock(wb.id, { dailyRate: v });
-                          else setWorkBlock(wb.id, { blockTotal: v });
-                        }}
-                        className={inputSmCls} />
-                    </label>
-                    <button type="button" onClick={() => set('workBlocks', workBlocks.filter((w) => w.id !== wb.id))}
-                      className="mb-0.5 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
-                      <TrashIcon />
-                    </button>
+                {workBlocks.map((wb) => {
+                  const days = getWeekdays(wb.startDate, wb.endDate);
+                  const hasError = days <= 0 && wb.startDate && wb.endDate;
+                  return (
+                  <div key={wb.id} className="space-y-1 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
+                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-end gap-2">
+                      <label className="block">
+                        <span className="text-[10px] font-medium text-slate-500">Description</span>
+                        <input type="text" value={wb.description} onChange={(e) => setWorkBlock(wb.id, { description: e.target.value })}
+                          className={inputSmCls} placeholder="Service description" />
+                      </label>
+                      <label className="block w-28">
+                        <span className="text-[10px] font-medium text-slate-500">Start</span>
+                        <input type="date" value={wb.startDate} onChange={(e) => setWorkBlock(wb.id, { startDate: e.target.value })}
+                          className={inputSmCls} />
+                      </label>
+                      <label className="block w-28">
+                        <span className="text-[10px] font-medium text-slate-500">End</span>
+                        <input type="date" value={wb.endDate} onChange={(e) => setWorkBlock(wb.id, { endDate: e.target.value })}
+                          className={inputSmCls} />
+                      </label>
+                      <div className="block w-12 text-center">
+                        <span className="text-[10px] font-medium text-slate-500">Days</span>
+                        <div className="mt-1 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">{days > 0 ? days : '—'}</div>
+                      </div>
+                      <label className="block w-24">
+                        <span className="text-[10px] font-medium text-slate-500">Rate ({sym})</span>
+                        <input type="number" step="0.01" min="0"
+                          value={wb.dailyRate || ''}
+                          onChange={(e) => setWorkBlock(wb.id, { dailyRate: parseFloat(e.target.value) || 0 })}
+                          className={inputSmCls} />
+                      </label>
+                      <label className="block w-24">
+                        <span className="text-[10px] font-medium text-slate-500">Total ({sym})</span>
+                        <input type="number" step="0.01" min="0"
+                          value={wb.blockTotal || ''}
+                          onChange={(e) => setWorkBlock(wb.id, { blockTotal: parseFloat(e.target.value) || 0 })}
+                          className={inputSmCls} />
+                      </label>
+                      <button type="button" onClick={() => set('workBlocks', workBlocks.filter((w) => w.id !== wb.id))}
+                        className="mb-0.5 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10">
+                        <TrashIcon />
+                      </button>
+                    </div>
+                    {hasError && (
+                      <p className="text-[10px] text-red-500">End date must be after start date.</p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

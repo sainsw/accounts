@@ -2,6 +2,10 @@ import type { InvoiceWorkBlock, InvoiceExpense } from './types';
 import { countWeekdaysInclusive } from '@sainsw/invoice-pdf';
 import type { ComputedWorkBlock } from '@sainsw/invoice-pdf';
 
+export function getWeekdays(start: string, end: string): number {
+  return countWeekdaysInclusive(start, end);
+}
+
 export function computeWorkBlock(wb: InvoiceWorkBlock): ComputedWorkBlock {
   const days = countWeekdaysInclusive(wb.startDate, wb.endDate);
   const lineTotal = wb.billingMode === 'daily' ? days * wb.dailyRate : wb.blockTotal;
