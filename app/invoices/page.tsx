@@ -469,6 +469,7 @@ function InvoicesContent() {
             const linkedTxs = transactions.filter((t) => t.invoiceId === editing.id);
             if (editing.status === 'paid' && data.status !== 'paid' && linkedTxs.length > 0) {
               setPendingStatusSave({ data, linkedTxs });
+              setModalOpen(false);
               return;
             }
             updateInvoice({ ...data, id: editing.id });
