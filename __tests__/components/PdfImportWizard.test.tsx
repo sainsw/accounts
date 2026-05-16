@@ -33,7 +33,7 @@ function makeFile(name: string): File {
 }
 
 describe('PdfImportWizard', () => {
-  let onComplete: ReturnType<typeof vi.fn>;
+  let onComplete: any;
 
   beforeEach(() => {
     onComplete = vi.fn();
@@ -44,7 +44,7 @@ describe('PdfImportWizard', () => {
   const defaultProps = {
     clients: [{ id: 'c-1', name: 'Acme Corp' }],
     existingInvoiceNumbers: [] as string[],
-    onComplete: vi.fn(),
+    onComplete: vi.fn() as any,
   };
 
   it('renders drop zone initially', () => {

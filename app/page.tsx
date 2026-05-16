@@ -3,13 +3,15 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
-import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear } from '@/lib/utils';
+import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear, todayString } from '@/lib/utils';
 import { calculateUKTax, calculateFlatTax } from '@/lib/tax';
+import { generateTaxHints } from '@/lib/smart-categorisation';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const { ready, settings, transactions, invoices, updateSettings } = useApp();
+  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries } = useApp();
   const [backupDismissed, setBackupDismissed] = useState(false);
+  const [dismissedHints, setDismissedHints] = useState<string[]>([]);
 
   const today = new Date().toISOString().split('T')[0];
   const currentYear = getFinancialYear(today, settings.taxYear);
@@ -158,6 +160,45 @@ export default function Dashboard() {
           </Link>
         </div>
       )}
+
+      {/* Tax Optimisation Hints */}
+      {settings.taxMode === 'uk-sole-trader' && (() => {
+        const hints = generateTaxHints(transactions, mileageEntries, wfhEntries, settings).filter((h) => !dismissedHints.includes(h.id));
+        if (hints.length === 0) return null;
+        return (
+          <div className="mt-4">
+            <Card>
+              <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Tax Hints</h2>
+              <div className="space-y-2">
+                {hints.map((hint) => (
+                  <div key={hint.id} className="flex items-start justify-between rounded-lg border border-blue-100 bg-blue-50 p-3 dark:border-blue-500/20 dark:bg-blue-500/5">
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">{hint.title}</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">{hint.description}</p>
+                    </div>
+                    <button onClick={() => setDismissedHints((prev) => [...prev, hint.id])} className="ml-2 shrink-0 text-xs text-blue-400 hover:text-blue-600">
+                      Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Quick links to reports */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <Link href="/reports/cash-flow" className="rounded-lg border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+          Cash Flow Forecast
+        </Link>
+        <Link href="/reports/balance-sheet" className="rounded-lg border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+          Balance Sheet
+        </Link>
+        <Link href="/reports/tax-calendar" className="rounded-lg border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
+          Tax Calendar
+        </Link>
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>

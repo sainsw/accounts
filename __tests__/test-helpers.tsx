@@ -50,11 +50,18 @@ export function createTransaction(overrides: Partial<Transaction> = {}): Transac
     category: 'Consulting',
     clientId: null,
     invoiceId: null,
+    projectId: null,
     notes: '',
     vatRate: null,
     vatAmount: 0,
     taxDeductible: true,
     attachments: [],
+    currency: null,
+    exchangeRate: null,
+    originalAmount: null,
+    recurrence: null,
+    reconciliationStatus: 'unreconciled',
+    importedFrom: null,
     ...overrides,
   };
 }

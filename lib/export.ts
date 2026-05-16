@@ -1,4 +1,4 @@
-import type { Transaction, TrackedInvoice, MonthlySummary, TaxBreakdown, Settings } from './types';
+import type { Transaction, TrackedInvoice, MonthlySummary, TaxBreakdown, Settings, MileageEntry } from './types';
 
 function escapeCsv(val: string): string {
   if (val.includes(',') || val.includes('"') || val.includes('\n')) {
@@ -109,6 +109,42 @@ export function exportTaxSummaryCSV(tax: TaxBreakdown, year: string): string {
   rows.push(['Total Tax & NI', tax.totalTax.toFixed(2)]);
   rows.push(['After Tax', tax.afterTax.toFixed(2)]);
 
+  return buildCsv(headers, rows);
+}
+
+export function exportMileageCSV(entries: MileageEntry[]): string {
+  const headers = ['Date', 'Description', 'From', 'To', 'Miles', 'Vehicle Type', 'Allowance'];
+  const rows = entries.map((e) => [
+    e.date,
+    e.description,
+    e.from || '',
+    e.to || '',
+    e.miles.toFixed(1),
+    e.vehicleType,
+    e.allowance.toFixed(2),
+  ]);
+  const totalMiles = entries.reduce((s, e) => s + e.miles, 0);
+  const totalAllowance = entries.reduce((s, e) => s + e.allowance, 0);
+  rows.push(['Total', '', '', '', totalMiles.toFixed(1), '', totalAllowance.toFixed(2)]);
+  return buildCsv(headers, rows);
+}
+
+export function exportClientStatementCSV(
+  transactions: Transaction[],
+  invoices: TrackedInvoice[],
+  clientName: string
+): string {
+  const headers = ['Date', 'Type', 'Description', 'Amount', 'Invoice #', 'Status'];
+  const rows: string[][] = [];
+
+  for (const inv of invoices) {
+    rows.push([inv.issueDate, 'Invoice', `Invoice ${inv.invoiceNumber}`, inv.amount.toFixed(2), inv.invoiceNumber, inv.status]);
+  }
+  for (const t of transactions) {
+    rows.push([t.date, t.type, t.description, t.amount.toFixed(2), '', '']);
+  }
+
+  rows.sort((a, b) => b[0].localeCompare(a[0]));
   return buildCsv(headers, rows);
 }
 

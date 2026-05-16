@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/sam/dev/personal/accounts -type f -name \"*.json\" -o -name \"*.ts\" -o -name \"*.tsx\" | head -30)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(find /Users/sam/Desktop -name \"TODO_FEATURES.md\" 2>/dev/null; find /Users/sam/dev/personal/accounts -name \"TODO_FEATURES.md\" 2>/dev/null)",
+      "Bash(npx vitest *)",
+      "Bash(npx next *)"
+    ]
+  }
+}

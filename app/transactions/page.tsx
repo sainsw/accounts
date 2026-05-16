@@ -7,6 +7,7 @@ import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import { calculateVatAmount } from '@/lib/vat';
 import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
+import { recognizeReceipt, type OcrResult } from '@/lib/receipt-ocr';
 import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
 
 type FormData = Omit<Transaction, 'id'>;
@@ -19,11 +20,18 @@ const emptyForm = (): FormData => ({
   category: '',
   clientId: null,
   invoiceId: null,
+  projectId: null,
   notes: '',
   vatRate: null,
   vatAmount: 0,
   taxDeductible: true,
   attachments: [],
+  currency: null,
+  exchangeRate: null,
+  originalAmount: null,
+  recurrence: null,
+  reconciliationStatus: 'unreconciled',
+  importedFrom: null,
 });
 
 export default function TransactionsPage() {
@@ -31,13 +39,15 @@ export default function TransactionsPage() {
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<'all' | TransactionType>('all');
+  const [filter, setFilter] = useState<'all' | TransactionType | 'recurring'>('all');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     let list = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
-    if (filter !== 'all') list = list.filter((t) => t.type === filter);
+    if (filter === 'recurring') list = list.filter((t) => t.recurrence?.active);
+    else if (filter !== 'all') list = list.filter((t) => t.type === filter);
     if (categoryFilter) list = list.filter((t) => t.category === categoryFilter);
     if (search) {
       const q = search.toLowerCase();
@@ -139,6 +149,27 @@ export default function TransactionsPage() {
         </div>
       </Card>
 
+      {/* Bulk actions bar */}
+      {selected.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg bg-brand-50 px-4 py-2 dark:bg-brand-500/10">
+          <span className="text-sm font-medium text-brand-700 dark:text-brand-300">{selected.size} selected</span>
+          <button
+            onClick={() => {
+              if (confirm(`Delete ${selected.size} transaction(s)?`)) {
+                selected.forEach((id) => deleteTransaction(id));
+                setSelected(new Set());
+              }
+            }}
+            className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-300"
+          >
+            Delete Selected
+          </button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-slate-500 hover:text-slate-700">
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* Transaction List */}
       {filtered.length === 0 ? (
         <EmptyState
@@ -156,6 +187,18 @@ export default function TransactionsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs font-medium text-slate-500 dark:border-slate-700">
+                  <th className="w-8 px-2 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={filtered.length > 0 && selected.size === filtered.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelected(new Set(filtered.map((t) => t.id)));
+                        else setSelected(new Set());
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                    />
+                  </th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3">Category</th>
@@ -172,9 +215,24 @@ export default function TransactionsPage() {
                   const isNonDeductible = t.type === 'cost' && t.taxDeductible === false;
                   return (
                     <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openEdit(t)}>
+                      <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${t.description}`}
+                          checked={selected.has(t.id)}
+                          onChange={(e) => {
+                            const next = new Set(selected);
+                            if (e.target.checked) next.add(t.id);
+                            else next.delete(t.id);
+                            setSelected(next);
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(t.date, locale)}</td>
                       <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                         {t.description}
+                        {t.recurrence?.active && <span className="ml-1.5 inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" title={`Recurring ${t.recurrence.frequency}`}>↻</span>}
                         {t.notes && <span className="ml-2 text-xs text-slate-400">{t.notes}</span>}
                         {(t.attachments?.length || 0) > 0 && <span className="ml-1 text-xs text-slate-400" title={`${t.attachments.length} attachment(s)`}>📎</span>}
                       </td>
@@ -309,6 +367,8 @@ function TransactionModal({
   onSave: (data: FormData) => void;
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<OcrResult | null>(null);
 
   const handleOpen = useCallback(() => {
     if (editing) {
@@ -490,13 +550,50 @@ function TransactionModal({
             placeholder="Optional notes" />
         </label>
 
-        {/* Attachments */}
+        {/* Attachments & Receipt Scan */}
         <div>
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Receipts / Attachments</span>
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-2">
             <input type="file" accept="image/*,.pdf" multiple onChange={handleFileUpload}
               className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
+            <label className="shrink-0 cursor-pointer rounded-lg border border-dashed border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/40 dark:text-brand-400 dark:hover:bg-brand-500/10">
+              {scanning ? 'Scanning...' : 'Scan Receipt'}
+              <input type="file" accept="image/*" className="hidden" disabled={scanning} onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setScanning(true);
+                setScanResult(null);
+                try {
+                  const result = await recognizeReceipt(file);
+                  setScanResult(result);
+                  if (result.totalAmount && result.confidence.totalAmount > 0.3) {
+                    setForm((prev) => ({ ...prev, amount: result.totalAmount! }));
+                  }
+                  if (result.date && result.confidence.date > 0.5) {
+                    setForm((prev) => ({ ...prev, date: result.date! }));
+                  }
+                  if (result.vendor && result.confidence.vendor > 0.4) {
+                    setForm((prev) => ({ ...prev, description: result.vendor! }));
+                  }
+                  if (result.vatAmount && result.confidence.vatAmount > 0.5) {
+                    setForm((prev) => ({ ...prev, vatAmount: result.vatAmount!, vatRate: 20 }));
+                  }
+                } catch {
+                  alert('Receipt scan failed. Please try a clearer image.');
+                } finally {
+                  setScanning(false);
+                }
+              }} />
+            </label>
           </div>
+          {scanResult && (
+            <div className="mt-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800 dark:bg-blue-500/10 dark:text-blue-300">
+              Scanned: {scanResult.totalAmount ? `${settings.currencySymbol}${scanResult.totalAmount.toFixed(2)}` : 'no amount'}
+              {scanResult.vendor && ` from ${scanResult.vendor}`}
+              {scanResult.date && ` on ${scanResult.date}`}
+              {' '}<button type="button" onClick={() => setScanResult(null)} className="underline">dismiss</button>
+            </div>
+          )}
           {(form.attachments || []).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {form.attachments.map((a) => (

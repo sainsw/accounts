@@ -91,6 +91,7 @@ export const defaultSettings: Settings = {
   email: '',
   phone: '',
   currencySymbol: '$',
+  baseCurrency: 'GBP',
   taxYear: 'calendar',
   taxMode: 'flat',
   taxRate: 0,
@@ -107,6 +108,7 @@ export const defaultSettings: Settings = {
   accountingBasis: 'cash',
   lastExportDate: null,
   invoicing: defaultInvoicingSettings,
+  logoData: null,
 };
 
 export const STORAGE_KEYS = {
@@ -115,4 +117,11 @@ export const STORAGE_KEYS = {
   clients: 'accounts.clients',
   invoices: 'accounts.invoices',
   onboardingDone: 'accounts.onboardingDone',
+  mileageEntries: 'accounts.mileageEntries',
+  wfhEntries: 'accounts.wfhEntries',
+  projects: 'accounts.projects',
+  assets: 'accounts.assets',
+  liabilities: 'accounts.liabilities',
+  budgets: 'accounts.budgets',
+  categorisationRules: 'accounts.categorisationRules',
 } as const;

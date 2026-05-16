@@ -50,3 +50,59 @@ select {
     font-size: 16px !important;
   }
 }
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 4px 8px;
+  }
+
+  a[href]::after {
+    content: none;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+}
+
+/* High contrast mode */
+@media (forced-colors: active) {
+  .rounded-full {
+    border: 1px solid;
+  }
+}
+
+@media (prefers-contrast: more) {
+  body {
+    --color-brand-500: #3730a3;
+  }
+
+  .text-slate-500,
+  .text-slate-400 {
+    color: #334155 !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .text-slate-500,
+    .text-slate-400 {
+      color: #cbd5e1 !important;
+    }
+  }
+}

@@ -6,6 +6,18 @@ export type Attachment = {
   data: string;
 };
 
+export type RecurrenceFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export type Recurrence = {
+  frequency: RecurrenceFrequency;
+  startDate: string;
+  endDate: string | null;
+  lastGenerated: string | null;
+  active: boolean;
+};
+
+export type ReconciliationStatus = 'unreconciled' | 'reconciled';
+
 export type Transaction = {
   id: string;
   date: string;
@@ -15,11 +27,18 @@ export type Transaction = {
   category: string;
   clientId: string | null;
   invoiceId: string | null;
+  projectId: string | null;
   notes: string;
   vatRate: number | null;
   vatAmount: number;
   taxDeductible: boolean;
   attachments: Attachment[];
+  currency: string | null;
+  exchangeRate: number | null;
+  originalAmount: number | null;
+  recurrence: Recurrence | null;
+  reconciliationStatus: ReconciliationStatus;
+  importedFrom: string | null;
 };
 
 export type Client = {
@@ -83,6 +102,100 @@ export type TrackedInvoice = {
   expenses?: InvoiceExpense[];
   taxRate?: number;
   purchaseOrder?: string;
+  recurrence?: Recurrence | null;
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  clientId: string | null;
+  description: string;
+  active: boolean;
+  createdAt: string;
+};
+
+export type MileageEntry = {
+  id: string;
+  date: string;
+  description: string;
+  from: string;
+  to: string;
+  miles: number;
+  vehicleType: VehicleType;
+  allowance: number;
+  transactionId: string | null;
+};
+
+export type VehicleType = 'car' | 'motorcycle' | 'bicycle';
+
+export type WfhEntry = {
+  id: string;
+  month: string;
+  hoursPerMonth: number;
+  allowance: number;
+  transactionId: string | null;
+};
+
+export type Asset = {
+  id: string;
+  name: string;
+  category: string;
+  purchaseDate: string;
+  purchaseValue: number;
+  usefulLifeYears: number;
+  depreciationMethod: 'straight-line';
+  disposedDate: string | null;
+  disposalValue: number | null;
+  notes: string;
+};
+
+export type Liability = {
+  id: string;
+  name: string;
+  category: string;
+  balance: number;
+  interestRate: number;
+  startDate: string;
+  notes: string;
+};
+
+export type Budget = {
+  id: string;
+  category: string;
+  amount: number;
+  period: 'monthly' | 'annual';
+  year: number;
+};
+
+export type CategorisationRule = {
+  id: string;
+  pattern: string;
+  category: string;
+  type: TransactionType;
+  createdAt: string;
+};
+
+export type BankStatementFormat = {
+  name: string;
+  dateColumn: string;
+  descriptionColumn: string;
+  amountColumn: string;
+  balanceColumn: string | null;
+  creditColumn: string | null;
+  debitColumn: string | null;
+  dateFormat: string;
+  skipRows: number;
+  delimiter: string;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  timestamp: string;
+  action: 'create' | 'update' | 'delete';
+  entityType: 'transaction' | 'invoice' | 'client' | 'settings' | 'mileage' | 'wfh' | 'asset' | 'liability' | 'project' | 'budget' | 'rule';
+  entityId: string;
+  before: unknown;
+  after: unknown;
 };
 
 export type TaxMode = 'flat' | 'uk-sole-trader';
@@ -107,6 +220,7 @@ export type Settings = {
   email: string;
   phone: string;
   currencySymbol: string;
+  baseCurrency: string;
   taxYear: 'calendar' | 'apr-mar' | 'jul-jun' | 'oct-sep';
   taxMode: TaxMode;
   taxRate: number;
@@ -123,6 +237,25 @@ export type Settings = {
   accountingBasis: AccountingBasis;
   lastExportDate: string | null;
   invoicing: InvoicingSettings;
+  logoData: string | null;
+};
+
+export type BackupData = {
+  schemaVersion: number;
+  exportedAt: string;
+  appVersion: string;
+  settings: Settings;
+  transactions: Transaction[];
+  clients: Client[];
+  invoices: TrackedInvoice[];
+  mileageEntries: MileageEntry[];
+  wfhEntries: WfhEntry[];
+  projects: Project[];
+  assets: Asset[];
+  liabilities: Liability[];
+  budgets: Budget[];
+  categorisationRules: CategorisationRule[];
+  auditLog: AuditLogEntry[];
 };
 
 export type TaxBandResult = {

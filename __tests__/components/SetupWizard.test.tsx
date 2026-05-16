@@ -35,7 +35,7 @@ vi.mock('@/lib/context', () => ({
 import SetupWizard from '../../components/SetupWizard';
 
 describe('SetupWizard', () => {
-  let onComplete: ReturnType<typeof vi.fn>;
+  let onComplete: any;
 
   beforeEach(() => {
     onComplete = vi.fn();

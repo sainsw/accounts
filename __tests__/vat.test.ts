@@ -13,11 +13,18 @@ function makeTx(overrides: Partial<Transaction>): Transaction {
     category: 'Consulting',
     clientId: null,
     invoiceId: null,
+    projectId: null,
     notes: '',
     vatRate: 20,
     vatAmount: 200,
     taxDeductible: true,
     attachments: [],
+    currency: null,
+    exchangeRate: null,
+    originalAmount: null,
+    recurrence: null,
+    reconciliationStatus: 'unreconciled',
+    importedFrom: null,
     ...overrides,
   };
 }

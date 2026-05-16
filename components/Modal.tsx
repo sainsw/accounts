@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 export function Modal({
   open,
@@ -15,29 +15,60 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    previousFocus.current = document.activeElement as HTMLElement;
+    const timer = setTimeout(() => dialogRef.current?.focus(), 0);
+
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      clearTimeout(timer);
+      previousFocus.current?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${wide ? 'p-0 md:p-4' : 'p-4'}`} onClick={onClose}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${wide ? 'p-0 md:p-4' : 'p-4'}`} onClick={onClose} role="presentation">
       <div
-        className={`w-full ${wide ? 'h-full max-w-full md:h-auto md:max-h-[90vh] md:max-w-5xl md:rounded-2xl' : 'max-w-lg max-h-[90vh] rounded-2xl'} overflow-y-auto bg-white shadow-2xl dark:bg-slate-800`}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex={-1}
+        className={`w-full ${wide ? 'h-full max-w-full md:h-auto md:max-h-[90vh] md:max-w-5xl md:rounded-2xl' : 'max-w-lg max-h-[90vh] rounded-2xl'} overflow-y-auto bg-white shadow-2xl dark:bg-slate-800 outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-0">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-white">
             {title}
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

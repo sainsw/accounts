@@ -8,6 +8,8 @@ import type { Settings, InvoicingSettings, ExtraReference } from '@/lib/types';
 import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES, UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META, defaultInvoicingSettings } from '@/lib/defaults';
 import { exportTransactionsCSV, exportInvoicesCSV, downloadCsv } from '@/lib/export';
 import { todayString } from '@/lib/utils';
+import { createBackup, downloadBackup, parseBackupFile } from '@/lib/backup';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   const { ready, settings, updateSettings } = useApp();
@@ -278,16 +280,54 @@ export default function SettingsPage() {
         {/* Invoicing Settings */}
         <InvoicingSettingsCard settings={settings} set={set} flash={flash} />
 
+        {/* Logo Upload */}
+        <Card>
+          <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Business Logo</h2>
+          <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Upload a logo to appear on your invoices.
+          </p>
+          <div className="flex items-center gap-4">
+            {settings.logoData && (
+              <img src={settings.logoData} alt="Logo" className="h-16 w-16 rounded-lg border border-slate-200 object-contain dark:border-slate-700" />
+            )}
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e) => {
+                  const file = (e.target as HTMLInputElement).files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => { set('logoData', reader.result as string); flash(); };
+                  reader.readAsDataURL(file);
+                };
+                input.click();
+              }}>Upload Logo</Button>
+              {settings.logoData && (
+                <Button size="sm" variant="ghost" onClick={() => { set('logoData', null); flash(); }}>Remove</Button>
+              )}
+            </div>
+          </div>
+        </Card>
+
         {/* Data Management */}
         <Card>
           <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Data Management</h2>
           <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-            All data is stored locally in your browser. Export your data to keep a backup.
+            All data is stored locally in your browser. You are responsible for keeping backups.
+            {settings.lastExportDate && (
+              <span className="ml-1 font-medium">Last backup: {settings.lastExportDate}</span>
+            )}
           </p>
+          <StorageUsage />
           <div className="flex flex-wrap gap-2">
             <ExportButton />
             <ExportCSVButton />
-            <ImportButton />
+            <RestoreButton />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Link href="/audit" className="text-xs text-brand-500 hover:underline">View Activity Log</Link>
           </div>
         </Card>
       </div>
@@ -450,20 +490,37 @@ function InvoicingSettingsCard({
   );
 }
 
+function StorageUsage() {
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) total += (localStorage.getItem(key) || '').length;
+    }
+  } catch { /* ignore */ }
+  const mb = ((total * 2) / (1024 * 1024)).toFixed(2);
+  const pct = Math.min((parseFloat(mb) / 5) * 100, 100);
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+        <span>Storage used: {mb} MB / ~5 MB</span>
+        <span>{pct.toFixed(0)}%</span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function ExportButton() {
-  const { transactions, clients, invoices, settings, updateSettings } = useApp();
-  const handleExport = () => {
-    const data = JSON.stringify({ settings, transactions, clients, invoices }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `accounts-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const { settings, updateSettings } = useApp();
+  const handleExport = async () => {
+    const data = await createBackup();
+    downloadBackup(data);
     updateSettings({ ...settings, lastExportDate: todayString() });
   };
-  return <Button variant="secondary" size="sm" onClick={handleExport}>Export JSON</Button>;
+  return <Button variant="secondary" size="sm" onClick={handleExport}>Full Backup (JSON)</Button>;
 }
 
 function ExportCSVButton() {
@@ -486,36 +543,34 @@ function ExportCSVButton() {
   );
 }
 
-function ImportButton() {
-  const { updateSettings, ...ctx } = useApp();
-  const handleImport = () => {
+function RestoreButton() {
+  const { importData } = useApp();
+  const [mode, setMode] = useState<'replace' | 'merge' | null>(null);
+
+  const handleRestore = (restoreMode: 'replace' | 'merge') => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const data = JSON.parse(ev.target?.result as string);
-          if (data.settings) updateSettings(data.settings);
-          if (data.transactions) {
-            for (const t of data.transactions) ctx.addTransaction(t);
-          }
-          if (data.clients) {
-            for (const c of data.clients) ctx.addClient(c);
-          }
-          if (data.invoices) {
-            for (const i of data.invoices) ctx.addInvoice(i);
-          }
-        } catch {
-          alert('Invalid file format');
-        }
-      };
-      reader.readAsText(file);
+      try {
+        const data = await parseBackupFile(file);
+        if (restoreMode === 'replace' && !confirm('This will replace ALL your current data. Are you sure?')) return;
+        importData(data, restoreMode);
+        alert(restoreMode === 'replace' ? 'Data restored successfully.' : 'Data merged successfully.');
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Failed to restore backup.');
+      }
+      setMode(null);
     };
     input.click();
   };
-  return <Button variant="ghost" size="sm" onClick={handleImport}>Import Data</Button>;
+
+  return (
+    <div className="flex gap-2">
+      <Button variant="ghost" size="sm" onClick={() => handleRestore('replace')}>Restore Backup</Button>
+      <Button variant="ghost" size="sm" onClick={() => handleRestore('merge')}>Merge Backup</Button>
+    </div>
+  );
 }

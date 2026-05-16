@@ -172,10 +172,10 @@ describe('SettingsPage', () => {
     expect(updateSettings).toHaveBeenCalled();
   });
 
-  it('export JSON button exists', () => {
+  it('export backup button exists', () => {
     setup();
     render(<SettingsPage />);
-    expect(screen.getByText('Export JSON')).toBeInTheDocument();
+    expect(screen.getByText('Full Backup (JSON)')).toBeInTheDocument();
   });
 
   it('auto-save flash message appears on settings change', async () => {
