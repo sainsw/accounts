@@ -315,7 +315,7 @@ function InvoicesContent() {
         {(() => {
           if (!markPaidInvoice) return null;
           const linkedTxs = transactions.filter((t) => t.invoiceId === markPaidInvoice.id);
-          const buildDesc = () => {
+          const buildNotes = () => {
             const parts: string[] = [];
             if (markPaidInvoice.workBlocks?.length) {
               parts.push(...markPaidInvoice.workBlocks.filter((wb) => wb.description).map((wb) => wb.description));
@@ -324,20 +324,18 @@ function InvoicesContent() {
               const expTotal = markPaidInvoice.expenses.reduce((s, e) => s + e.amount, 0);
               if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
             }
-            return parts.length > 0
-              ? `Invoice #${markPaidInvoice.invoiceNumber}: ${parts.join(', ')}`
-              : `Invoice #${markPaidInvoice.invoiceNumber}`;
+            return parts.join(', ');
           };
           const createTx = () => {
             addTransaction({
               date: markPaidDate,
               type: 'income',
               amount: markPaidInvoice.amount,
-              description: buildDesc(),
+              description: `Invoice #${markPaidInvoice.invoiceNumber}`,
               category: settings.incomeCategories?.[0] || 'Consulting',
               clientId: markPaidInvoice.clientId || null,
               invoiceId: markPaidInvoice.id,
-              notes: '',
+              notes: buildNotes(),
               vatRate: null,
               vatAmount: 0,
               taxDeductible: true,

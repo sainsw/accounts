@@ -29,7 +29,7 @@ export function Modal({
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${wide ? 'p-0 md:p-4' : 'p-4'}`} onClick={onClose}>
       <div
-        className={`w-full ${wide ? 'h-full max-w-full md:h-auto md:max-h-[90vh] md:max-w-5xl md:rounded-2xl' : 'max-h-[90vh] rounded-2xl'} overflow-y-auto bg-white shadow-2xl dark:bg-slate-800`}
+        className={`w-full ${wide ? 'h-full max-w-full md:h-auto md:max-h-[90vh] md:max-w-5xl md:rounded-2xl' : 'max-w-lg max-h-[90vh] rounded-2xl'} overflow-y-auto bg-white shadow-2xl dark:bg-slate-800`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-0">
