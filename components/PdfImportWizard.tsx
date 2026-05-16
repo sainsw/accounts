@@ -240,19 +240,19 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Invoice #</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice #</span>
               <input type="text" value={form.invoiceNumber} onChange={(e) => updateForm('invoiceNumber', e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Amount</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Amount</span>
               <input type="number" step="0.01" min="0" value={form.amount || ''} onChange={(e) => updateForm('amount', parseFloat(e.target.value) || 0)}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
           </div>
 
           <label className="block">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Client</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client</span>
             <div className="mt-1 flex gap-2">
               <select
                 value={form.clientId ?? ''}
@@ -273,12 +273,12 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
               <input type="date" value={form.issueDate} onChange={(e) => updateForm('issueDate', e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</span>
               <select value={form.status} onChange={(e) => {
                 const newStatus = e.target.value as TrackedInvoice['status'];
                 updateForm('status', newStatus);
@@ -297,7 +297,7 @@ export default function PdfImportWizard({ clients, existingInvoiceNumbers, onCom
 
           {form.status === 'paid' && (
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Paid Date</span>
               <span className="ml-1 text-[10px] text-slate-400">(used for tax year)</span>
               <input type="date" value={form.paidDate || ''} onChange={(e) => updateForm('paidDate', e.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600" />

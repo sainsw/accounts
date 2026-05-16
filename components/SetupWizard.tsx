@@ -221,7 +221,7 @@ export default function SetupWizard({ onComplete }: { onComplete: () => void }) 
               </div>
               {taxMode === 'flat' && (
                 <label className="mt-3 block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Tax rate (%)</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tax rate (%)</span>
                   <input
                     type="number"
                     min="0"

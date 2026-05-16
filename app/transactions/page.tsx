@@ -122,7 +122,7 @@ export default function TransactionsPage() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-xs dark:border-slate-600"
+            className="rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm dark:border-slate-600"
           >
             <option value="">All categories</option>
             {allCategories.map((c) => (

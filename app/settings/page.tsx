@@ -69,27 +69,27 @@ export default function SettingsPage() {
           <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Business Information</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Business Name</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Business Name</span>
               <input type="text" value={settings.businessName} onChange={(e) => { set('businessName', e.target.value); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
               <input type="email" value={settings.email} onChange={(e) => { set('email', e.target.value); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Phone</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Phone</span>
               <input type="tel" value={settings.phone} onChange={(e) => { set('phone', e.target.value); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Currency Symbol</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Currency Symbol</span>
               <input type="text" value={settings.currencySymbol} onChange={(e) => { set('currencySymbol', e.target.value); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" maxLength={5} />
             </label>
             <label className="block sm:col-span-2">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Business Address</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Business Address</span>
               <textarea value={settings.businessAddress} onChange={(e) => { set('businessAddress', e.target.value); flash(); }} rows={2}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
             </label>
@@ -101,7 +101,7 @@ export default function SettingsPage() {
           <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">Tax Settings</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Financial Year</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Financial Year</span>
               <select value={settings.taxYear} onChange={(e) => { set('taxYear', e.target.value as Settings['taxYear']); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                 <option value="calendar">Calendar Year (Jan - Dec)</option>
@@ -111,7 +111,7 @@ export default function SettingsPage() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Tax Calculation</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Tax Calculation</span>
               <select value={settings.taxMode} onChange={(e) => { set('taxMode', e.target.value as Settings['taxMode']); flash(); }}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                 <option value="flat">Flat Rate</option>
@@ -120,7 +120,7 @@ export default function SettingsPage() {
             </label>
             {settings.taxMode === 'flat' && (
               <label className="block">
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Estimated Tax Rate (%)</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Estimated Tax Rate (%)</span>
                 <input type="number" min="0" max="100" step="0.5" value={settings.taxRate} onChange={(e) => { set('taxRate', parseFloat(e.target.value) || 0); flash(); }}
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
               </label>
@@ -128,7 +128,7 @@ export default function SettingsPage() {
             {settings.taxMode === 'uk-sole-trader' && (
               <>
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Accounting Basis</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Accounting Basis</span>
                   <select value={settings.accountingBasis} onChange={(e) => { set('accountingBasis', e.target.value as Settings['accountingBasis']); flash(); }}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                     <option value="cash">Cash Basis</option>
@@ -141,7 +141,7 @@ export default function SettingsPage() {
                   </p>
                 </label>
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Student Loan Plan</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Student Loan Plan</span>
                   <select value={settings.studentLoanPlan} onChange={(e) => { set('studentLoanPlan', e.target.value as Settings['studentLoanPlan']); flash(); }}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                     <option value="none">None</option>
@@ -156,12 +156,12 @@ export default function SettingsPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={settings.voluntaryClass2NI} onChange={(e) => { set('voluntaryClass2NI', e.target.checked); flash(); }}
                       className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
-                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">I voluntarily pay Class 2 NI</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">I voluntarily pay Class 2 NI</span>
                   </label>
                   <span className="text-xs text-slate-400">(for state pension entitlement — not required from 2024/25)</span>
                 </div>
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Locale</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Locale</span>
                   <select value={settings.locale} onChange={(e) => { set('locale', e.target.value); flash(); }}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                     <option value="en-GB">English (UK) — 5 Mar 2025</option>
@@ -181,13 +181,13 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={settings.vatRegistered} onChange={(e) => { set('vatRegistered', e.target.checked); flash(); }}
                   className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
-                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Registered</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">VAT Registered</span>
               </label>
             </div>
             {settings.vatRegistered && (
               <>
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Scheme</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">VAT Scheme</span>
                   <select value={settings.vatScheme} onChange={(e) => { set('vatScheme', e.target.value as Settings['vatScheme']); flash(); }}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-600">
                     <option value="standard">Standard</option>
@@ -197,14 +197,14 @@ export default function SettingsPage() {
                 </label>
                 {settings.vatScheme === 'flat-rate' && (
                   <label className="block">
-                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Flat Rate (%)</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Flat Rate (%)</span>
                     <input type="number" min="0" max="100" step="0.5" value={settings.vatFlatRate}
                       onChange={(e) => { set('vatFlatRate', parseFloat(e.target.value) || 0); flash(); }}
                       className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600" />
                   </label>
                 )}
                 <label className="block">
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">VAT Number</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">VAT Number</span>
                   <input type="text" value={settings.vatNumber} onChange={(e) => { set('vatNumber', e.target.value); flash(); }}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
                     placeholder="GB 123 4567 89" />
@@ -333,27 +333,27 @@ function InvoicingSettingsCard({
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Daily Rate</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Default Daily Rate</span>
           <input type="number" step="0.01" min="0" value={inv.defaultDailyRate || ''} onChange={(e) => setInv('defaultDailyRate', parseFloat(e.target.value) || 0)}
             className={inputCls} />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Payment Terms (days)</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Default Payment Terms (days)</span>
           <input type="number" min="0" value={inv.defaultPaymentTerms} onChange={(e) => setInv('defaultPaymentTerms', parseInt(e.target.value) || 0)}
             className={inputCls} />
         </label>
         <label className="block sm:col-span-2">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Bank Details</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Bank Details</span>
           <textarea value={inv.bankDetails} onChange={(e) => setInv('bankDetails', e.target.value)} rows={3}
             className={inputCls} placeholder="Account name, sort code, account number..." />
         </label>
         <label className="block sm:col-span-2">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Default Notes</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Default Notes</span>
           <textarea value={inv.defaultNotes} onChange={(e) => setInv('defaultNotes', e.target.value)} rows={2}
             className={inputCls} placeholder="Pre-filled notes for new invoices" />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Header Color</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Header Color</span>
           <div className="mt-1 flex items-center gap-2">
             <input type="color" value={inv.headerColor} onChange={(e) => setInv('headerColor', e.target.value)}
               className="h-8 w-8 cursor-pointer rounded border border-slate-300 dark:border-slate-600" />
@@ -363,7 +363,7 @@ function InvoicingSettingsCard({
           </div>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Body Color</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Body Color</span>
           <div className="mt-1 flex items-center gap-2">
             <input type="color" value={inv.bodyColor} onChange={(e) => setInv('bodyColor', e.target.value)}
               className="h-8 w-8 cursor-pointer rounded border border-slate-300 dark:border-slate-600" />
@@ -373,7 +373,7 @@ function InvoicingSettingsCard({
           </div>
         </label>
         <label className="block sm:col-span-2">
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Filename Template</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Filename Template</span>
           <input type="text" value={inv.filenameTemplate} onChange={(e) => setInv('filenameTemplate', e.target.value)}
             className={inputCls} />
           <p className="mt-1 text-xs text-slate-400">

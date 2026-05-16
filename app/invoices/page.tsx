@@ -502,7 +502,7 @@ function InvoiceModal({
   const defaultRate = settings.invoicing?.defaultDailyRate || 0;
 
   const inputCls = "mt-1 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
-  const inputSmCls = "w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
+  const inputSmCls = "w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600";
 
   return (
     <Modal open={open} onClose={onClose} title={importData ? 'Import from Invoicer' : editing ? 'Edit Invoice' : 'Track Invoice'} wide={itemized}>
@@ -601,33 +601,33 @@ function InvoiceModal({
                   <div key={wb.id} className="space-y-1 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
                     <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-end gap-2">
                       <label className="block">
-                        <span className="text-[10px] font-medium text-slate-500">Description</span>
+                        <span className="text-xs font-medium text-slate-500">Description</span>
                         <input type="text" value={wb.description} onChange={(e) => setWorkBlock(wb.id, { description: e.target.value })}
                           className={inputSmCls} placeholder="Service description" />
                       </label>
                       <label className="block w-28">
-                        <span className="text-[10px] font-medium text-slate-500">Start</span>
+                        <span className="text-xs font-medium text-slate-500">Start</span>
                         <input type="date" value={wb.startDate} onChange={(e) => setWorkBlock(wb.id, { startDate: e.target.value })}
                           className={inputSmCls} />
                       </label>
                       <label className="block w-28">
-                        <span className="text-[10px] font-medium text-slate-500">End</span>
+                        <span className="text-xs font-medium text-slate-500">End</span>
                         <input type="date" value={wb.endDate} onChange={(e) => setWorkBlock(wb.id, { endDate: e.target.value })}
                           className={inputSmCls} />
                       </label>
                       <div className="block w-12 text-center">
-                        <span className="text-[10px] font-medium text-slate-500">Days</span>
+                        <span className="text-xs font-medium text-slate-500">Days</span>
                         <div className="mt-1 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">{days > 0 ? days : '—'}</div>
                       </div>
                       <label className="block w-24">
-                        <span className="text-[10px] font-medium text-slate-500">Rate ({sym})</span>
+                        <span className="text-xs font-medium text-slate-500">Rate ({sym})</span>
                         <input type="number" step="0.01" min="0"
                           value={wb.dailyRate || ''}
                           onChange={(e) => setWorkBlock(wb.id, { dailyRate: parseFloat(e.target.value) || 0 })}
                           className={inputSmCls} />
                       </label>
                       <label className="block w-24">
-                        <span className="text-[10px] font-medium text-slate-500">Total ({sym})</span>
+                        <span className="text-xs font-medium text-slate-500">Total ({sym})</span>
                         <input type="number" step="0.01" min="0"
                           value={wb.blockTotal || ''}
                           onChange={(e) => setWorkBlock(wb.id, { blockTotal: parseFloat(e.target.value) || 0 })}
@@ -639,7 +639,7 @@ function InvoiceModal({
                       </button>
                     </div>
                     {hasError && (
-                      <p className="text-[10px] text-red-500">End date must be after start date.</p>
+                      <p className="text-xs text-red-500">End date must be after start date.</p>
                     )}
                   </div>
                   );
@@ -663,17 +663,17 @@ function InvoiceModal({
                 {expenses.map((ex) => (
                   <div key={ex.id} className="grid grid-cols-[auto_1fr_auto_auto] items-end gap-2 rounded-lg bg-white p-2 shadow-sm dark:bg-slate-800">
                     <label className="block w-32">
-                      <span className="text-[10px] font-medium text-slate-500">Date</span>
+                      <span className="text-xs font-medium text-slate-500">Date</span>
                       <input type="date" value={ex.date} onChange={(e) => setExpense(ex.id, { date: e.target.value })}
                         className={inputSmCls} />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-medium text-slate-500">Notes</span>
+                      <span className="text-xs font-medium text-slate-500">Notes</span>
                       <input type="text" value={ex.notes} onChange={(e) => setExpense(ex.id, { notes: e.target.value })}
                         className={inputSmCls} placeholder="Expense description" />
                     </label>
                     <label className="block w-24">
-                      <span className="text-[10px] font-medium text-slate-500">Amount ({sym})</span>
+                      <span className="text-xs font-medium text-slate-500">Amount ({sym})</span>
                       <input type="number" step="0.01" min="0" value={ex.amount || ''} onChange={(e) => setExpense(ex.id, { amount: parseFloat(e.target.value) || 0 })}
                         className={inputSmCls} />
                     </label>
@@ -689,7 +689,7 @@ function InvoiceModal({
             {/* Tax */}
             <div className="flex items-center gap-3">
               <label className="block w-28">
-                <span className="text-[10px] font-medium text-slate-500">Tax Rate (%)</span>
+                <span className="text-xs font-medium text-slate-500">Tax Rate (%)</span>
                 <input type="number" step="0.01" min="0" max="100" value={taxRate || ''} onChange={(e) => set('taxRate', parseFloat(e.target.value) || 0)}
                   className={inputSmCls} />
               </label>
