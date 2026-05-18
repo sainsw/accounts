@@ -6,6 +6,7 @@ import { Card, PageHeader } from '@/components/Card';
 import { formatCurrency } from '@/lib/utils';
 import { parseBankStatement, autoMatchEntries, applyCategorisationRules, BANK_PRESETS, type ParsedBankEntry, getColumnHeaders } from '@/lib/bank-import';
 import { importFromCSV, getCSVHeaders, getCSVPreview, COMPETITOR_PRESETS, type ImportResult } from '@/lib/competitor-import';
+import { detectFormat, parseOFX, parseQIF, type ParsedBankEntry as OFXEntry } from '@/lib/ofx-import';
 import type { BankStatementFormat } from '@/lib/types';
 
 type ImportTab = 'bank' | 'competitor';
@@ -34,8 +35,43 @@ export default function ImportPage() {
     reader.onload = () => {
       const text = reader.result as string;
       setCsvText(text);
-      const format = BANK_PRESETS[selectedPreset];
-      let entries = parseBankStatement(text, format);
+
+      const fileFormat = detectFormat(text);
+      let entries: ParsedBankEntry[];
+
+      if (fileFormat === 'ofx') {
+        const ofxEntries = parseOFX(text);
+        entries = ofxEntries.map((e, i) => ({
+          id: `ofx-${i}-${Date.now()}`,
+          date: e.date,
+          description: e.description,
+          amount: Math.abs(e.amount),
+          type: (e.amount >= 0 ? 'income' : 'cost') as 'income' | 'cost',
+          balance: e.balance ?? null,
+          status: 'pending' as const,
+          matchedTransactionId: null,
+          matchConfidence: 0,
+          suggestedCategory: null,
+        }));
+      } else if (fileFormat === 'qif') {
+        const qifEntries = parseQIF(text);
+        entries = qifEntries.map((e, i) => ({
+          id: `qif-${i}-${Date.now()}`,
+          date: e.date,
+          description: e.description,
+          amount: Math.abs(e.amount),
+          type: (e.amount >= 0 ? 'income' : 'cost') as 'income' | 'cost',
+          balance: e.balance ?? null,
+          status: 'pending' as const,
+          matchedTransactionId: null,
+          matchConfidence: 0,
+          suggestedCategory: null,
+        }));
+      } else {
+        const format = BANK_PRESETS[selectedPreset];
+        entries = parseBankStatement(text, format);
+      }
+
       entries = autoMatchEntries(entries, transactions);
       entries = applyCategorisationRules(entries, categorisationRules);
       setBankEntries(entries);
@@ -150,7 +186,7 @@ export default function ImportPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">CSV File</label>
+                <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">Statement File (CSV, OFX, QIF)</label>
                 <input ref={fileRef} type="file" accept=".csv,.ofx,.qif" onChange={handleBankFile} className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-600 hover:file:bg-brand-100 dark:text-slate-400" />
               </div>
             </div>

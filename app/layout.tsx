@@ -5,6 +5,7 @@ import Nav from '@/components/Nav';
 import OnboardingGate from '@/components/OnboardingGate';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import { AppProvider } from '@/lib/context';
+import { LayoutShell } from '@/components/LayoutShell';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -52,7 +53,7 @@ export default function RootLayout({
           </aside>
           <main id="main-content" className="min-w-0 flex-1 overflow-y-auto" role="main">
             <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 print:px-0 print:py-0">
-              {children}
+              <LayoutShell>{children}</LayoutShell>
             </div>
           </main>
         </AppProvider>

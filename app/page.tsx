@@ -1,17 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
-import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear, todayString } from '@/lib/utils';
+import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear, todayString, generateId } from '@/lib/utils';
 import { calculateUKTax, calculateFlatTax } from '@/lib/tax';
 import { generateTaxHints } from '@/lib/smart-categorisation';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries } = useApp();
+  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries, addTransaction } = useApp();
   const [backupDismissed, setBackupDismissed] = useState(false);
   const [dismissedHints, setDismissedHints] = useState<string[]>([]);
+  const [quickDesc, setQuickDesc] = useState('');
+  const [quickAmount, setQuickAmount] = useState('');
+  const [quickType, setQuickType] = useState<'income' | 'cost'>('cost');
 
   const today = new Date().toISOString().split('T')[0];
   const currentYear = getFinancialYear(today, settings.taxYear);
@@ -47,6 +50,8 @@ export default function Dashboard() {
         })
       : calculateFlatTax(yearNet, settings.taxRate);
 
+    const unreconciledCount = transactions.filter((t) => t.reconciliationStatus === 'unreconciled').length;
+
     return {
       yearIncome,
       yearCosts,
@@ -58,6 +63,7 @@ export default function Dashboard() {
       outstandingCount: outstanding.length,
       overdueCount,
       tax,
+      unreconciledCount,
     };
   }, [transactions, invoices, yearRange, curMonth, settings, currentYear]);
 
@@ -65,6 +71,8 @@ export default function Dashboard() {
     () => [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8),
     [transactions]
   );
+
+  const priorYearRange = getYearRange(currentYear - 1, settings.taxYear);
 
   const monthlyData = useMemo(() => {
     const months: Record<string, { income: number; costs: number }> = {};
@@ -79,6 +87,56 @@ export default function Dashboard() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({ month, ...data, net: data.income - data.costs }));
   }, [transactions, yearRange]);
+
+  const priorYearData = useMemo(() => {
+    const priorTx = transactions.filter((t) => isInRange(t.date, priorYearRange.start, priorYearRange.end));
+    const priorIncome = priorTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const priorCosts = priorTx.filter((t) => t.type === 'cost').reduce((s, t) => s + t.amount, 0);
+    return { income: priorIncome, costs: priorCosts, net: priorIncome - priorCosts };
+  }, [transactions, priorYearRange]);
+
+  const handleQuickAdd = useCallback(() => {
+    const amount = parseFloat(quickAmount);
+    if (!quickDesc.trim() || !amount || amount <= 0) return;
+    addTransaction({
+      date: todayString(),
+      type: quickType,
+      amount,
+      description: quickDesc.trim(),
+      category: quickType === 'income' ? 'Other Income' : 'Other Cost',
+      clientId: null,
+      invoiceId: null,
+      projectId: null,
+      notes: 'Added via quick entry',
+      vatRate: null,
+      vatAmount: 0,
+      taxDeductible: quickType === 'cost',
+      attachments: [],
+      currency: null,
+      exchangeRate: null,
+      originalAmount: null,
+      recurrence: null,
+      reconciliationStatus: 'unreconciled',
+      importedFrom: null,
+    });
+    setQuickDesc('');
+    setQuickAmount('');
+  }, [quickDesc, quickAmount, quickType, addTransaction]);
+
+  // Health check
+  const healthCheck = useMemo(() => {
+    const issues: { label: string; severity: 'warning' | 'info'; href: string }[] = [];
+    if (!settings.lastExportDate || ((Date.now() - new Date(settings.lastExportDate).getTime()) / 86400000) >= 30) {
+      issues.push({ label: 'Backup overdue', severity: 'warning', href: '/settings' });
+    }
+    if (stats.unreconciledCount > 0) {
+      issues.push({ label: `${stats.unreconciledCount} unreconciled`, severity: 'info', href: '/transactions' });
+    }
+    if (stats.overdueCount > 0) {
+      issues.push({ label: `${stats.overdueCount} overdue invoice${stats.overdueCount > 1 ? 's' : ''}`, severity: 'warning', href: '/invoices' });
+    }
+    return issues;
+  }, [settings.lastExportDate, stats.unreconciledCount, stats.overdueCount]);
 
   if (!ready) return null;
 
@@ -135,6 +193,28 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Year-on-year comparison */}
+      {priorYearData.income > 0 && (
+        <div className="mt-2 flex gap-4 text-xs text-slate-500 dark:text-slate-400">
+          {[
+            { label: 'Income', current: stats.yearIncome, prior: priorYearData.income },
+            { label: 'Costs', current: stats.yearCosts, prior: priorYearData.costs },
+            { label: 'Net', current: stats.yearNet, prior: priorYearData.net },
+          ].map(({ label, current, prior }) => {
+            const pct = prior !== 0 ? ((current - prior) / Math.abs(prior)) * 100 : 0;
+            return (
+              <span key={label} className="flex items-center gap-1">
+                {label}:
+                <span className={pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                  {pct >= 0 ? '↑' : '↓'}{Math.abs(pct).toFixed(0)}%
+                </span>
+                vs last year
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {/* Tax estimate row */}
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label={`${formatMonth(curMonth + '-01', locale)} Income`} value={formatCurrency(stats.monthIncome, sym)} color="green" />
@@ -187,6 +267,29 @@ export default function Dashboard() {
         );
       })()}
 
+      {/* Health check */}
+      {healthCheck.length > 0 && (
+        <div className="mt-4">
+          <Card>
+            <h2 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">Health Check</h2>
+            <div className="flex flex-wrap gap-2">
+              {healthCheck.map((issue) => (
+                <Link key={issue.label} href={issue.href}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    issue.severity === 'warning'
+                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-300'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-500/10 dark:text-blue-300'
+                  }`}
+                >
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${issue.severity === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                  {issue.label}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Quick links to reports */}
       <div className="mt-4 grid grid-cols-3 gap-3">
         <Link href="/reports/cash-flow" className="rounded-lg border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
@@ -198,6 +301,50 @@ export default function Dashboard() {
         <Link href="/reports/tax-calendar" className="rounded-lg border border-slate-200 p-3 text-center text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">
           Tax Calendar
         </Link>
+      </div>
+
+      {/* Quick entry */}
+      <div className="mt-4">
+        <Card>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Quick Entry</h2>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex rounded-lg border border-slate-200 dark:border-slate-700">
+              <button onClick={() => setQuickType('cost')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-l-lg ${quickType === 'cost' ? 'bg-red-500 text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                Cost
+              </button>
+              <button onClick={() => setQuickType('income')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-r-lg ${quickType === 'income' ? 'bg-emerald-500 text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                Income
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Description"
+              value={quickDesc}
+              onChange={(e) => setQuickDesc(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
+              className="flex-1 min-w-[140px] rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            />
+            <input
+              type="number"
+              placeholder="Amount"
+              value={quickAmount}
+              onChange={(e) => setQuickAmount(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
+              className="w-24 rounded-lg border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              step="0.01"
+              min="0"
+            />
+            <button
+              onClick={handleQuickAdd}
+              disabled={!quickDesc.trim() || !quickAmount}
+              className="rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Add
+            </button>
+          </div>
+        </Card>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

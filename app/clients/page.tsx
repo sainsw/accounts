@@ -5,6 +5,7 @@ import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { exportClientStatementCSV, downloadCsv } from '@/lib/export';
 import type { Client } from '@/lib/types';
 
 type FormData = Omit<Client, 'id' | 'createdAt'>;
@@ -111,15 +112,37 @@ export default function ClientsPage() {
                       <TrashIcon />
                     </button>
                   </div>
-                  <div className="mt-3 flex gap-4 text-xs">
-                    <span className="text-emerald-600 dark:text-emerald-400">
-                      Income: {formatCurrency(stat.income, sym)}
-                    </span>
-                    <span className="text-slate-500">
-                      {stat.invoiceCount} invoice{stat.invoiceCount !== 1 ? 's' : ''}
-                    </span>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500">Income</span>
+                      <p className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(stat.income, sym)}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Costs</span>
+                      <p className="font-medium text-red-600 dark:text-red-400">{formatCurrency(stat.costs, sym)}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Net Profit</span>
+                      <p className={`font-medium ${stat.income - stat.costs >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {formatCurrency(stat.income - stat.costs, sym)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">Added {formatDate(c.createdAt)}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-slate-400">{stat.invoiceCount} invoice{stat.invoiceCount !== 1 ? 's' : ''}</p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const clientTxs = transactions.filter((t) => t.clientId === c.id);
+                        const clientInvs = invoices.filter((i) => i.clientId === c.id);
+                        const csv = exportClientStatementCSV(clientTxs, clientInvs, c.name);
+                        downloadCsv(csv, `statement-${c.name.toLowerCase().replace(/\s+/g, '-')}.csv`);
+                      }}
+                      className="text-xs font-medium text-brand-500 hover:underline"
+                    >
+                      Export Statement
+                    </button>
+                  </div>
                 </div>
               </Card>
             );

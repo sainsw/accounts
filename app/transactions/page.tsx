@@ -8,6 +8,7 @@ import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import { calculateVatAmount } from '@/lib/vat';
 import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
 import { recognizeReceipt, type OcrResult } from '@/lib/receipt-ocr';
+import { useUndo } from '@/lib/undo-context';
 import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
 
 type FormData = Omit<Transaction, 'id'>;
@@ -36,6 +37,7 @@ const emptyForm = (): FormData => ({
 
 export default function TransactionsPage() {
   const { ready, settings, transactions, clients, invoices, addTransaction, updateTransaction, deleteTransaction, deleteInvoice, updateInvoice } = useApp();
+  const undoStack = useUndo();
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -114,7 +116,7 @@ export default function TransactionsPage() {
             className="w-48 rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
           />
           <div className="flex rounded-lg border border-slate-300 dark:border-slate-600">
-            {(['all', 'income', 'cost'] as const).map((f) => (
+            {(['all', 'income', 'cost', 'recurring'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -262,19 +264,33 @@ export default function TransactionsPage() {
                         </td>
                       )}
                       <td className="px-4 py-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (t.invoiceId && invoices.some((inv) => inv.id === t.invoiceId)) {
-                              setConfirmDeleteTx(t);
-                            } else {
-                              deleteTransaction(t.id);
-                            }
-                          }}
-                          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                        >
-                          <TrashIcon />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {t.recurrence?.active && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateTransaction({ ...t, recurrence: { ...t.recurrence!, active: false } });
+                              }}
+                              title="Stop recurrence"
+                              className="rounded p-1 text-slate-400 hover:bg-amber-50 hover:text-amber-500 dark:hover:bg-amber-500/10"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5"><rect x="3" y="3" width="10" height="10" rx="1" /></svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (t.invoiceId && invoices.some((inv) => inv.id === t.invoiceId)) {
+                                setConfirmDeleteTx(t);
+                              } else {
+                                deleteTransaction(t.id);
+                              }
+                            }}
+                            className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -334,9 +350,25 @@ export default function TransactionsPage() {
         clients={clients}
         onSave={(data) => {
           if (editing) {
-            updateTransaction({ ...data, id: editing.id });
+            const prev = { ...editing };
+            const updated = { ...data, id: editing.id };
+            updateTransaction(updated);
+            undoStack.push({
+              description: `Edit "${data.description}"`,
+              undo: () => updateTransaction(prev),
+              redo: () => updateTransaction(updated),
+            });
           } else {
             addTransaction(data);
+            undoStack.push({
+              description: `Add "${data.description}"`,
+              undo: () => {
+                // Find and remove the most recently added matching transaction
+                const match = transactions.find((t) => t.description === data.description && t.amount === data.amount && t.date === data.date);
+                if (match) deleteTransaction(match.id);
+              },
+              redo: () => addTransaction(data),
+            });
           }
           setModalOpen(false);
         }}
@@ -558,7 +590,7 @@ function TransactionModal({
               className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
             <label className="shrink-0 cursor-pointer rounded-lg border border-dashed border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/40 dark:text-brand-400 dark:hover:bg-brand-500/10">
               {scanning ? 'Scanning...' : 'Scan Receipt'}
-              <input type="file" accept="image/*" className="hidden" disabled={scanning} onChange={async (e) => {
+              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 setScanning(true);
@@ -578,6 +610,17 @@ function TransactionModal({
                   if (result.vatAmount && result.confidence.vatAmount > 0.5) {
                     setForm((prev) => ({ ...prev, vatAmount: result.vatAmount!, vatRate: 20 }));
                   }
+                  // Auto-attach scanned receipt image
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const attachment: Attachment = {
+                      id: `receipt-${Date.now()}`,
+                      name: file.name,
+                      data: reader.result as string,
+                    };
+                    setForm((prev) => ({ ...prev, attachments: [...(prev.attachments || []), attachment] }));
+                  };
+                  reader.readAsDataURL(file);
                 } catch {
                   alert('Receipt scan failed. Please try a clearer image.');
                 } finally {
