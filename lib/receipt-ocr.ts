@@ -79,13 +79,10 @@ export async function recognizeReceipt(
     : await RawImage.read(imageData);
 
   const task = '<OCR>';
-  const visionInputs = await processor(image);
-  const prompts = processor.construct_prompts(task);
-  const textInputs = tokenizer(prompts);
+  const inputs = await processor(image, task);
 
   const generatedIds = await model.generate({
-    ...textInputs,
-    pixel_values: visionInputs.pixel_values,
+    ...inputs,
     max_new_tokens: 1024,
   });
 
