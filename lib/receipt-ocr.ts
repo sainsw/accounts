@@ -40,9 +40,9 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
     const [model, processor, tokenizer] = await Promise.all([
       Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, {
         dtype: {
-          embed_tokens: 'fp16',
-          vision_encoder: 'fp16',
-          encoder_model: 'fp16',
+          embed_tokens: 'fp32',
+          vision_encoder: 'fp32',
+          encoder_model: 'fp32',
           decoder_model_merged: 'q4',
         },
         progress_callback: (p: any) => {

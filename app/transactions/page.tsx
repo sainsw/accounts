@@ -692,7 +692,8 @@ function TransactionModal({
                     setForm((prev) => ({ ...prev, attachments: [...(prev.attachments || []), attachment] }));
                   };
                   reader.readAsDataURL(file);
-                } catch {
+                } catch (err) {
+                  console.error('Receipt scan failed:', err);
                   alert('Receipt scan failed. Please try a clearer image.');
                 } finally {
                   setScanStatus(null);
