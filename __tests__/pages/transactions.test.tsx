@@ -15,6 +15,18 @@ vi.mock('@/lib/export', () => ({
   downloadCsv: vi.fn(),
 }));
 
+vi.mock('@/lib/undo-context', () => ({
+  useUndo: () => ({
+    canUndo: false,
+    canRedo: false,
+    undoDescription: null,
+    redoDescription: null,
+    push: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+  }),
+}));
+
 import TransactionsPage from '../../app/transactions/page';
 import { useApp } from '@/lib/context';
 

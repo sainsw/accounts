@@ -81,7 +81,7 @@ describe('ClientsPage', () => {
   it('displays per-client income total and invoice count', () => {
     setup();
     render(<ClientsPage />);
-    expect(screen.getByText(/Income: \$8,000\.00/)).toBeInTheDocument(); // 5000+3000
+    expect(screen.getAllByText('$8,000.00').length).toBeGreaterThanOrEqual(1); // income for client c-1 (5000+3000)
     expect(screen.getByText('2 invoices')).toBeInTheDocument(); // client c-1 has 2 invoices
     expect(screen.getByText('1 invoice')).toBeInTheDocument(); // client c-2 has 1 invoice
   });

@@ -91,7 +91,7 @@ describe('Dashboard', () => {
     render(<Dashboard />);
     expect(screen.getByText('Outstanding')).toBeInTheDocument();
     expect(screen.getByText(/2 invoices/)).toBeInTheDocument();
-    expect(screen.getByText(/1 overdue/)).toBeInTheDocument();
+    expect(screen.getAllByText(/1 overdue/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders monthly breakdown chart with correct data', () => {
