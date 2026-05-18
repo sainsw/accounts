@@ -170,9 +170,9 @@ describe('TransactionsPage', () => {
     const deleteFn = vi.fn();
     setup({ deleteTransaction: deleteFn, transactions: [baseTx[0]] });
     render(<TransactionsPage />);
-    // Click the delete button (trash icon) - it's the button inside the table row
-    const deleteButtons = document.querySelectorAll('table button');
-    fireEvent.click(deleteButtons[0]);
+    // Click the delete button (trash icon) - last button in the table row (after select checkbox and reconcile)
+    const tableButtons = document.querySelectorAll('table tbody button');
+    fireEvent.click(tableButtons[tableButtons.length - 1]);
     expect(deleteFn).toHaveBeenCalledWith('tx-1');
   });
 

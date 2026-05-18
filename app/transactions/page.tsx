@@ -43,7 +43,7 @@ export default function TransactionsPage() {
   const [ruleSuggestion, setRuleSuggestion] = useState<{ pattern: string; category: string; type: TransactionType; count: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [filter, setFilter] = useState<'all' | TransactionType | 'recurring'>('all');
+  const [filter, setFilter] = useState<'all' | TransactionType | 'recurring' | 'unreconciled'>('all');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -51,6 +51,7 @@ export default function TransactionsPage() {
   const filtered = useMemo(() => {
     let list = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
     if (filter === 'recurring') list = list.filter((t) => t.recurrence?.active);
+    else if (filter === 'unreconciled') list = list.filter((t) => t.reconciliationStatus === 'unreconciled');
     else if (filter !== 'all') list = list.filter((t) => t.type === filter);
     if (categoryFilter) list = list.filter((t) => t.category === categoryFilter);
     if (search) {
@@ -118,7 +119,7 @@ export default function TransactionsPage() {
             className="w-48 rounded-lg border border-slate-300 bg-transparent px-3 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-600"
           />
           <div className="flex rounded-lg border border-slate-300 dark:border-slate-600">
-            {(['all', 'income', 'cost', 'recurring'] as const).map((f) => (
+            {(['all', 'income', 'cost', 'recurring', 'unreconciled'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -180,6 +181,20 @@ export default function TransactionsPage() {
       {selected.size > 0 && (
         <div className="mb-4 flex items-center gap-3 rounded-lg bg-brand-50 px-4 py-2 dark:bg-brand-500/10">
           <span className="text-sm font-medium text-brand-700 dark:text-brand-300">{selected.size} selected</span>
+          <button
+            onClick={() => {
+              selected.forEach((id) => {
+                const tx = transactions.find((t) => t.id === id);
+                if (tx && tx.reconciliationStatus !== 'reconciled') {
+                  updateTransaction({ ...tx, reconciliationStatus: 'reconciled' });
+                }
+              });
+              setSelected(new Set());
+            }}
+            className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300"
+          >
+            Reconcile Selected
+          </button>
           <button
             onClick={() => {
               if (confirm(`Delete ${selected.size} transaction(s)?`)) {
@@ -290,6 +305,24 @@ export default function TransactionsPage() {
                       )}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateTransaction({
+                                ...t,
+                                reconciliationStatus: t.reconciliationStatus === 'reconciled' ? 'unreconciled' : 'reconciled',
+                              });
+                            }}
+                            title={t.reconciliationStatus === 'reconciled' ? 'Reconciled — click to unreconcile' : 'Unreconciled — click to reconcile'}
+                            className={cn(
+                              'rounded p-1 transition-colors',
+                              t.reconciliationStatus === 'reconciled'
+                                ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                                : 'text-slate-300 hover:bg-slate-100 hover:text-slate-500 dark:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-400'
+                            )}
+                          >
+                            <CheckCircleIcon />
+                          </button>
                           {t.recurrence?.active && (
                             <button
                               onClick={(e) => {
@@ -700,6 +733,14 @@ function PlusIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
     </svg>
   );
 }
