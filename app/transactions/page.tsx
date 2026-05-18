@@ -7,7 +7,7 @@ import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import { calculateVatAmount } from '@/lib/vat';
 import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
-import { recognizeReceipt, type OcrResult } from '@/lib/receipt-ocr';
+import { recognizeReceipt, type OcrResult, type OcrProgress } from '@/lib/receipt-ocr';
 import { suggestRuleFromRecategorisation } from '@/lib/smart-categorisation';
 import { useUndo } from '@/lib/undo-context';
 import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
@@ -464,7 +464,7 @@ function TransactionModal({
   onSave: (data: FormData) => void;
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
-  const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<OcrResult | null>(null);
 
   const handleOpen = useCallback(() => {
@@ -654,14 +654,20 @@ function TransactionModal({
             <input type="file" accept="image/*,.pdf" multiple onChange={handleFileUpload}
               className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
             <label className="shrink-0 cursor-pointer rounded-lg border border-dashed border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/40 dark:text-brand-400 dark:hover:bg-brand-500/10">
-              {scanning ? 'Scanning...' : 'Scan Receipt'}
-              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={scanning} onChange={async (e) => {
+              {scanStatus || 'Scan Receipt'}
+              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={!!scanStatus} onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setScanning(true);
+                setScanStatus('Loading...');
                 setScanResult(null);
                 try {
-                  const result = await recognizeReceipt(file);
+                  const result = await recognizeReceipt(file, (p) => {
+                    if (p.status === 'downloading') {
+                      setScanStatus(p.progress != null ? `Loading model ${Math.round(p.progress)}%` : 'Loading model...');
+                    } else if (p.status === 'scanning') {
+                      setScanStatus('Scanning...');
+                    }
+                  });
                   setScanResult(result);
                   if (result.totalAmount && result.confidence.totalAmount > 0.3) {
                     setForm((prev) => ({ ...prev, amount: result.totalAmount! }));
@@ -689,7 +695,7 @@ function TransactionModal({
                 } catch {
                   alert('Receipt scan failed. Please try a clearer image.');
                 } finally {
-                  setScanning(false);
+                  setScanStatus(null);
                 }
               }} />
             </label>

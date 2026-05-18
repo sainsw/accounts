@@ -12,20 +12,94 @@ export type OcrResult = {
   rawText: string;
 };
 
-let tesseractWorker: unknown = null;
+export type OcrProgress = {
+  status: 'downloading' | 'scanning' | 'ready';
+  progress?: number;
+};
 
-async function getWorker() {
-  if (tesseractWorker) return tesseractWorker;
+const MODEL_ID = 'onnx-community/Florence-2-base-ft';
 
-  const Tesseract = await import('tesseract.js');
-  const worker = await Tesseract.createWorker('eng');
-  tesseractWorker = worker;
-  return worker;
+type ModelBundle = { model: any; processor: any; tokenizer: any };
+
+let cached: ModelBundle | null = null;
+let loading: Promise<ModelBundle> | null = null;
+
+async function getModel(onProgress?: (p: OcrProgress) => void) {
+  if (cached) return cached;
+  if (loading) return loading;
+
+  loading = (async () => {
+    const {
+      Florence2ForConditionalGeneration,
+      AutoProcessor,
+      AutoTokenizer,
+    } = await import('@huggingface/transformers');
+
+    onProgress?.({ status: 'downloading', progress: 0 });
+
+    const [model, processor, tokenizer] = await Promise.all([
+      Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, {
+        dtype: {
+          embed_tokens: 'fp16',
+          vision_encoder: 'fp16',
+          encoder_model: 'fp16',
+          decoder_model_merged: 'q4',
+        },
+        progress_callback: (p: any) => {
+          if (p.status === 'progress' && typeof p.progress === 'number') {
+            onProgress?.({ status: 'downloading', progress: p.progress });
+          }
+        },
+      }),
+      AutoProcessor.from_pretrained(MODEL_ID),
+      AutoTokenizer.from_pretrained(MODEL_ID),
+    ]);
+
+    cached = { model, processor, tokenizer };
+    onProgress?.({ status: 'ready' });
+    return cached;
+  })();
+
+  loading.catch(() => { loading = null; });
+  return loading!;
 }
 
-export async function recognizeReceipt(imageData: string | File): Promise<OcrResult> {
-  const worker = await getWorker() as { recognize: (img: string | File) => Promise<{ data: { text: string } }> };
-  const { data: { text } } = await worker.recognize(imageData);
+export async function recognizeReceipt(
+  imageData: string | File,
+  onProgress?: (p: OcrProgress) => void,
+): Promise<OcrResult> {
+  const { RawImage } = await import('@huggingface/transformers');
+  const bundle = await getModel(onProgress);
+  const { model, processor, tokenizer } = bundle;
+
+  onProgress?.({ status: 'scanning' });
+
+  const image = imageData instanceof File
+    ? await RawImage.fromBlob(imageData)
+    : await RawImage.read(imageData);
+
+  const task = '<OCR>';
+  const visionInputs = await processor(image);
+  const prompts = processor.construct_prompts(task);
+  const textInputs = tokenizer(prompts);
+
+  const generatedIds = await model.generate({
+    ...textInputs,
+    pixel_values: visionInputs.pixel_values,
+    max_new_tokens: 1024,
+  });
+
+  const generatedText = tokenizer.batch_decode(generatedIds, {
+    skip_special_tokens: false,
+  })[0];
+
+  const result = processor.post_process_generation(
+    generatedText,
+    task,
+    image.size,
+  );
+
+  const text: string = result[task] ?? generatedText;
   return parseReceiptText(text);
 }
 
@@ -42,14 +116,12 @@ export function parseReceiptText(text: string): OcrResult {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return result;
 
-  // Vendor: usually the first non-empty meaningful line
   const vendorLine = lines.find((l) => l.length > 2 && !/^\d/.test(l) && !/total|vat|tax|change|card/i.test(l));
   if (vendorLine) {
     result.vendor = vendorLine.slice(0, 50);
     result.confidence.vendor = 0.6;
   }
 
-  // Total amount: look for "total" followed by a number
   const totalPatterns = [
     /(?:total|amount\s*due|balance\s*due|grand\s*total)\s*[:\s£$€]?\s*([\d,]+\.?\d*)/i,
     /(?:total|amount)\s*[:]\s*[£$€]?\s*([\d,]+\.?\d*)/i,
@@ -68,7 +140,6 @@ export function parseReceiptText(text: string): OcrResult {
     }
   }
 
-  // If no total found, take the largest number on the receipt
   if (!result.totalAmount) {
     const amounts = text.match(/[£$€]?\s*(\d+\.\d{2})/g);
     if (amounts) {
@@ -81,7 +152,6 @@ export function parseReceiptText(text: string): OcrResult {
     }
   }
 
-  // VAT amount
   const vatPattern = /(?:vat|tax)\s*[:\s£$€]?\s*([\d,]+\.?\d*)/i;
   const vatMatch = text.match(vatPattern);
   if (vatMatch) {
@@ -92,7 +162,6 @@ export function parseReceiptText(text: string): OcrResult {
     }
   }
 
-  // Date parsing
   const datePatterns = [
     { regex: /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/, format: 'dmy' },
     { regex: /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/, format: 'ymd' },

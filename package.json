@@ -14,12 +14,12 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@huggingface/transformers": "^4.2.0",
     "@sainsw/invoice-pdf": "^1.0.0",
     "next": "16.2.6",
     "pdfjs-dist": "^4.10.38",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "tesseract.js": "^7.0.0"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
