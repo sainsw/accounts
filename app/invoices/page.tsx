@@ -559,6 +559,7 @@ function InvoiceModal({
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
   const [itemized, setItemized] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   useMemo(() => {
     if (open) {
@@ -853,19 +854,38 @@ function InvoiceModal({
         <div className="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
           <div>
             {editing && (
-              <button
-                type="button"
-                onClick={() => {
-                  const finalForm = { ...form };
-                  if (itemized && totals) finalForm.amount = totals.total;
-                  onSave(finalForm);
-                  const client = clients.find((c) => c.id === editing.clientId);
-                  downloadInvoicePdf({ ...finalForm, id: editing.id } as TrackedInvoice, settings, client);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-              >
-                <DownloadIcon /> Download PDF
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const finalForm = { ...form };
+                    if (itemized && totals) finalForm.amount = totals.total;
+                    const client = clients.find((c) => c.id === editing.clientId);
+                    try {
+                      const attachment = getInvoicePdfAttachment({ ...finalForm, id: editing.id } as TrackedInvoice, settings, client);
+                      setPreviewUri(attachment.data);
+                    } catch {
+                      alert('Failed to generate preview.');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const finalForm = { ...form };
+                    if (itemized && totals) finalForm.amount = totals.total;
+                    onSave(finalForm);
+                    const client = clients.find((c) => c.id === editing.clientId);
+                    downloadInvoicePdf({ ...finalForm, id: editing.id } as TrackedInvoice, settings, client);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  <DownloadIcon /> Download PDF
+                </button>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -880,6 +900,15 @@ function InvoiceModal({
           </div>
         </div>
       </form>
+      {previewUri && (
+        <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Invoice Preview</h3>
+            <button type="button" onClick={() => setPreviewUri(null)} className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400">Close preview</button>
+          </div>
+          <iframe src={previewUri} title="Invoice preview" className="h-[500px] w-full rounded-lg border border-slate-200 bg-white dark:border-slate-700" />
+        </div>
+      )}
     </Modal>
   );
 }

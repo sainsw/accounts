@@ -6,6 +6,7 @@ import { Card, EmptyState, PageHeader } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { exportClientStatementCSV, downloadCsv } from '@/lib/export';
+import Link from 'next/link';
 import type { Client } from '@/lib/types';
 
 type FormData = Omit<Client, 'id' | 'createdAt'>;
@@ -129,7 +130,14 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <p className="text-xs text-slate-400">{stat.invoiceCount} invoice{stat.invoiceCount !== 1 ? 's' : ''}</p>
+                    <div className="flex gap-3 text-xs">
+                      <Link href={`/invoices?client=${c.id}`} className="text-brand-500 hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {stat.invoiceCount} invoice{stat.invoiceCount !== 1 ? 's' : ''}
+                      </Link>
+                      <Link href={`/transactions?client=${c.id}`} className="text-brand-500 hover:underline" onClick={(e) => e.stopPropagation()}>
+                        Transactions
+                      </Link>
+                    </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

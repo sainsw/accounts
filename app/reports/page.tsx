@@ -17,16 +17,43 @@ export default function ReportsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('monthly');
   const [showPriorYear, setShowPriorYear] = useState(false);
   const [showSASummary, setShowSASummary] = useState(false);
+  const [currencyFilter, setCurrencyFilter] = useState<string>('all');
   const yearRange = getYearRange(year, settings.taxYear);
   const priorYearRange = getYearRange(year - 1, settings.taxYear);
 
   const sym = settings.currencySymbol || '$';
   const locale = settings.locale || 'en-US';
 
-  const yearTx = useMemo(
+  const allYearTx = useMemo(
     () => transactions.filter((t) => isInRange(t.date, yearRange.start, yearRange.end)),
     [transactions, yearRange]
   );
+
+  const availableCurrencies = useMemo(() => {
+    const currencies = new Set<string>();
+    for (const t of allYearTx) {
+      if (t.currency) currencies.add(t.currency);
+    }
+    return Array.from(currencies).sort();
+  }, [allYearTx]);
+
+  const yearTx = useMemo(
+    () => currencyFilter === 'all' ? allYearTx : allYearTx.filter((t) => (t.currency || settings.baseCurrency || 'GBP') === currencyFilter),
+    [allYearTx, currencyFilter, settings.baseCurrency]
+  );
+
+  const fxGainsLosses = useMemo(() => {
+    let total = 0;
+    for (const t of allYearTx) {
+      if (t.originalAmount && t.exchangeRate && t.exchangeRate !== 1) {
+        // Difference between converted amount and what it would be at rate 1.0
+        const atPar = t.originalAmount;
+        const converted = t.amount;
+        total += converted - atPar;
+      }
+    }
+    return total;
+  }, [allYearTx]);
 
   const priorYearTx = useMemo(
     () => transactions.filter((t) => isInRange(t.date, priorYearRange.start, priorYearRange.end)),
@@ -216,7 +243,30 @@ export default function ReportsPage() {
             Self-Assessment Helper
           </label>
         )}
+        {availableCurrencies.length > 0 && (
+          <select
+            value={currencyFilter}
+            onChange={(e) => setCurrencyFilter(e.target.value)}
+            className="rounded-lg border border-slate-300 px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+          >
+            <option value="all">All currencies</option>
+            {availableCurrencies.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        )}
       </div>
+
+      {/* FX Gains/Losses */}
+      {fxGainsLosses !== 0 && currencyFilter === 'all' && (
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+          <span className="text-slate-600 dark:text-slate-400">Exchange rate adjustment: </span>
+          <span className={fxGainsLosses >= 0 ? 'font-medium text-emerald-600 dark:text-emerald-400' : 'font-medium text-red-600 dark:text-red-400'}>
+            {fxGainsLosses >= 0 ? '+' : ''}{formatCurrency(Math.abs(fxGainsLosses), sym)}
+            {fxGainsLosses >= 0 ? ' gain' : ' loss'}
+          </span>
+        </div>
+      )}
 
       {/* Tax Breakdown */}
       <Card className="mb-6">

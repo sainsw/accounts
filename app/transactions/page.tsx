@@ -8,6 +8,7 @@ import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import { calculateVatAmount } from '@/lib/vat';
 import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
 import { recognizeReceipt, type OcrResult } from '@/lib/receipt-ocr';
+import { suggestRuleFromRecategorisation } from '@/lib/smart-categorisation';
 import { useUndo } from '@/lib/undo-context';
 import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
 
@@ -36,9 +37,10 @@ const emptyForm = (): FormData => ({
 });
 
 export default function TransactionsPage() {
-  const { ready, settings, transactions, clients, invoices, addTransaction, updateTransaction, deleteTransaction, deleteInvoice, updateInvoice } = useApp();
+  const { ready, settings, transactions, clients, invoices, addTransaction, updateTransaction, deleteTransaction, deleteInvoice, updateInvoice, categorisationRules, addRule } = useApp();
   const undoStack = useUndo();
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
+  const [ruleSuggestion, setRuleSuggestion] = useState<{ pattern: string; category: string; type: TransactionType; count: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [filter, setFilter] = useState<'all' | TransactionType | 'recurring'>('all');
@@ -150,6 +152,29 @@ export default function TransactionsPage() {
           </div>
         </div>
       </Card>
+
+      {/* Rule suggestion banner */}
+      {ruleSuggestion && (
+        <div className="mb-4 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3 dark:bg-blue-500/10">
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            You categorised this as &ldquo;{ruleSuggestion.category}&rdquo;. Create a rule so transactions containing &ldquo;{ruleSuggestion.pattern}&rdquo; are auto-categorised? ({ruleSuggestion.count} other matching transaction{ruleSuggestion.count !== 1 ? 's' : ''})
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                addRule({ pattern: ruleSuggestion.pattern, category: ruleSuggestion.category, type: ruleSuggestion.type });
+                setRuleSuggestion(null);
+              }}
+              className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+            >
+              Create Rule
+            </button>
+            <button onClick={() => setRuleSuggestion(null)} className="text-xs text-blue-500 hover:text-blue-700">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bulk actions bar */}
       {selected.size > 0 && (
@@ -358,6 +383,13 @@ export default function TransactionsPage() {
               undo: () => updateTransaction(prev),
               redo: () => updateTransaction(updated),
             });
+            // Suggest categorisation rule if category changed
+            if (data.category !== editing.category) {
+              const suggestion = suggestRuleFromRecategorisation(editing, data.category, transactions);
+              if (suggestion) {
+                setRuleSuggestion({ pattern: suggestion.pattern, category: data.category, type: data.type, count: suggestion.count });
+              }
+            }
           } else {
             addTransaction(data);
             undoStack.push({

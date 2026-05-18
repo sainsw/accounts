@@ -5,11 +5,11 @@ import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear, todayString, generateId } from '@/lib/utils';
 import { calculateUKTax, calculateFlatTax } from '@/lib/tax';
-import { generateTaxHints } from '@/lib/smart-categorisation';
+import { generateTaxHints, suggestCategory } from '@/lib/smart-categorisation';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries, addTransaction } = useApp();
+  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries, addTransaction, categorisationRules, updateTransaction } = useApp();
   const [backupDismissed, setBackupDismissed] = useState(false);
   const [dismissedHints, setDismissedHints] = useState<string[]>([]);
   const [quickDesc, setQuickDesc] = useState('');
@@ -122,6 +122,31 @@ export default function Dashboard() {
     setQuickDesc('');
     setQuickAmount('');
   }, [quickDesc, quickAmount, quickType, addTransaction]);
+
+  // Next tax deadline
+  const nextDeadline = useMemo(() => {
+    if (settings.taxMode !== 'uk-sole-trader') return null;
+    const yr = currentYear;
+    const deadlines = [
+      { date: `${yr + 1}-01-31`, label: 'Self Assessment + Balancing Payment' },
+      { date: `${yr + 1}-07-31`, label: '2nd Payment on Account' },
+    ];
+    if (settings.vatRegistered) {
+      deadlines.push(
+        { date: `${yr}-05-07`, label: 'VAT Q1 Return' },
+        { date: `${yr}-08-07`, label: 'VAT Q2 Return' },
+        { date: `${yr}-11-07`, label: 'VAT Q3 Return' },
+        { date: `${yr + 1}-02-07`, label: 'VAT Q4 Return' },
+      );
+    }
+    const upcoming = deadlines
+      .filter((d) => d.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (upcoming.length === 0) return null;
+    const next = upcoming[0];
+    const daysUntil = Math.ceil((new Date(next.date).getTime() - new Date(today).getTime()) / 86400000);
+    return { ...next, daysUntil, estimatedTax: stats.tax.totalTax };
+  }, [settings.taxMode, settings.vatRegistered, currentYear, today, stats.tax.totalTax]);
 
   // Health check
   const healthCheck = useMemo(() => {
@@ -241,6 +266,29 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Tax deadline countdown */}
+      {nextDeadline && (
+        <div className="mt-4">
+          <Link href="/reports/tax-calendar">
+            <Card className="hover:border-brand-300 transition-colors cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-slate-500">Next Tax Deadline</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{nextDeadline.label}</p>
+                  <p className="text-xs text-slate-500">{formatDate(nextDeadline.date, locale)} &middot; Est. {formatCurrency(nextDeadline.estimatedTax, sym)}</p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-2xl font-bold ${nextDeadline.daysUntil <= 30 ? 'text-red-600 dark:text-red-400' : nextDeadline.daysUntil <= 90 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {nextDeadline.daysUntil}
+                  </p>
+                  <p className="text-xs text-slate-500">days</p>
+                </div>
+              </div>
+            </Card>
+          </Link>
+        </div>
+      )}
+
       {/* Tax Optimisation Hints */}
       {settings.taxMode === 'uk-sole-trader' && (() => {
         const hints = generateTaxHints(transactions, mileageEntries, wfhEntries, settings).filter((h) => !dismissedHints.includes(h.id));
@@ -258,6 +306,39 @@ export default function Dashboard() {
                     </div>
                     <button onClick={() => setDismissedHints((prev) => [...prev, hint.id])} className="ml-2 shrink-0 text-xs text-blue-400 hover:text-blue-600">
                       Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Category suggestions for uncategorised transactions */}
+      {(() => {
+        const uncategorised = transactions.filter((t) => !t.category || t.category.startsWith('Other'));
+        const suggestions = uncategorised.slice(0, 5).map((t) => {
+          const suggested = suggestCategory(t.description, t.type, categorisationRules, transactions);
+          return suggested ? { transaction: t, suggested } : null;
+        }).filter(Boolean) as { transaction: typeof transactions[0]; suggested: string }[];
+        if (suggestions.length === 0) return null;
+        return (
+          <div className="mt-4">
+            <Card>
+              <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Category Suggestions</h2>
+              <div className="space-y-2">
+                {suggestions.map(({ transaction: t, suggested }) => (
+                  <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/50">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{t.description}</p>
+                      <p className="text-xs text-slate-500">{formatCurrency(t.amount, sym)} &middot; {t.category || 'Uncategorised'}</p>
+                    </div>
+                    <button
+                      onClick={() => updateTransaction({ ...t, category: suggested })}
+                      className="ml-3 shrink-0 rounded-lg bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300"
+                    >
+                      &rarr; {suggested}
                     </button>
                   </div>
                 ))}

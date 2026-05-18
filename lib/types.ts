@@ -238,6 +238,7 @@ export type Settings = {
   lastExportDate: string | null;
   invoicing: InvoicingSettings;
   logoData: string | null;
+  highContrast?: boolean;
 };
 
 export type BackupData = {
@@ -256,6 +257,7 @@ export type BackupData = {
   budgets: Budget[];
   categorisationRules: CategorisationRule[];
   auditLog: AuditLogEntry[];
+  attachments?: Array<{ id: string; transactionId: string; name: string; mimeType: string; data: string }>;
 };
 
 export type TaxBandResult = {

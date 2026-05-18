@@ -8,7 +8,7 @@ import type { Settings, InvoicingSettings, ExtraReference } from '@/lib/types';
 import { DEFAULT_COST_CATEGORIES, DEFAULT_INCOME_CATEGORIES, UK_COST_CATEGORIES, DEFAULT_COST_CATEGORY_META, defaultInvoicingSettings } from '@/lib/defaults';
 import { exportTransactionsCSV, exportInvoicesCSV, downloadCsv } from '@/lib/export';
 import { todayString } from '@/lib/utils';
-import { createBackup, downloadBackup, parseBackupFile } from '@/lib/backup';
+import { createBackup, downloadBackup, parseBackupFile, restoreAttachments } from '@/lib/backup';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -172,6 +172,14 @@ export default function SettingsPage() {
                 </label>
               </>
             )}
+            <div className="sm:col-span-2 flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={settings.highContrast ?? false} onChange={(e) => { set('highContrast', e.target.checked); flash(); }}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">High Contrast Mode</span>
+              </label>
+              <span className="text-xs text-slate-500">Increases text and border contrast for better readability</span>
+            </div>
           </div>
         </Card>
 
@@ -558,7 +566,9 @@ function RestoreButton() {
         const data = await parseBackupFile(file);
         if (restoreMode === 'replace' && !confirm('This will replace ALL your current data. Are you sure?')) return;
         importData(data, restoreMode);
-        alert(restoreMode === 'replace' ? 'Data restored successfully.' : 'Data merged successfully.');
+        const attachmentCount = await restoreAttachments(data);
+        const attachmentMsg = attachmentCount > 0 ? ` ${attachmentCount} attachment(s) restored.` : '';
+        alert((restoreMode === 'replace' ? 'Data restored successfully.' : 'Data merged successfully.') + attachmentMsg);
       } catch (err) {
         alert(err instanceof Error ? err.message : 'Failed to restore backup.');
       }

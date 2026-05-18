@@ -1,5 +1,5 @@
 import type { BackupData } from './types';
-import { getAllAuditEntries } from './indexeddb';
+import { getAllAuditEntries, getAllAttachments, saveAttachment, type StoredAttachment } from './indexeddb';
 import { STORAGE_KEYS } from './defaults';
 
 const CURRENT_SCHEMA_VERSION = 1;
@@ -16,6 +16,15 @@ export async function createBackup(): Promise<BackupData> {
   };
 
   const auditLog = await getAllAuditEntries().catch(() => []);
+  const rawAttachments = await getAllAttachments().catch(() => []);
+  // Convert ArrayBuffer data to base64 strings for JSON serialisation
+  const attachments = rawAttachments.map((a) => ({
+    id: a.id,
+    transactionId: a.transactionId,
+    name: a.name,
+    mimeType: a.mimeType,
+    data: typeof a.data === 'string' ? a.data : arrayBufferToBase64(a.data as ArrayBuffer),
+  }));
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -33,7 +42,37 @@ export async function createBackup(): Promise<BackupData> {
     budgets: load(STORAGE_KEYS.budgets, []),
     categorisationRules: load(STORAGE_KEYS.categorisationRules, []),
     auditLog,
+    attachments,
   } as unknown as BackupData;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+export async function restoreAttachments(data: BackupData): Promise<number> {
+  const attachments = data.attachments || [];
+  let count = 0;
+  for (const a of attachments) {
+    try {
+      await saveAttachment({
+        id: a.id,
+        transactionId: a.transactionId,
+        name: a.name,
+        mimeType: a.mimeType,
+        data: a.data,
+      });
+      count++;
+    } catch {
+      // Skip failed attachments
+    }
+  }
+  return count;
 }
 
 export function downloadBackup(data: BackupData): void {
