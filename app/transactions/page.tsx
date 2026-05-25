@@ -655,7 +655,7 @@ function TransactionModal({
               className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
             <label className="shrink-0 cursor-pointer rounded-lg border border-dashed border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/40 dark:text-brand-400 dark:hover:bg-brand-500/10">
               {scanStatus || 'Scan Receipt'}
-              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={!!scanStatus} onChange={async (e) => {
+              <input type="file" accept="image/*" className="hidden" disabled={!!scanStatus} onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 setScanStatus('Loading...');
