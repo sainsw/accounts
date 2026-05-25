@@ -13,7 +13,7 @@ export type OcrResult = {
 };
 
 export type OcrProgress = {
-  status: 'downloading' | 'scanning' | 'ready';
+  status: 'downloading' | 'initialising' | 'scanning' | 'ready';
   progress?: number;
 };
 
@@ -40,14 +40,17 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
     const [model, processor, tokenizer] = await Promise.all([
       Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, {
         dtype: {
-          embed_tokens: 'fp32',
-          vision_encoder: 'fp32',
-          encoder_model: 'fp32',
+          embed_tokens: 'q4',
+          vision_encoder: 'q4',
+          encoder_model: 'q4',
           decoder_model_merged: 'q4',
         },
         progress_callback: (p: any) => {
           if (p.status === 'progress' && typeof p.progress === 'number') {
             onProgress?.({ status: 'downloading', progress: p.progress });
+          }
+          if (p.status === 'ready') {
+            onProgress?.({ status: 'initialising' });
           }
         },
       }),
@@ -97,7 +100,28 @@ export async function recognizeReceipt(
   );
 
   const text: string = result[task] ?? generatedText;
+  if (typeof window !== 'undefined') {
+    console.log('[receipt-ocr] raw text:', JSON.stringify(text));
+  }
   return parseReceiptText(text);
+}
+
+/**
+ * Florence-2 OCR often returns text as a single continuous string rather than
+ * line-by-line. We normalise by splitting on multiple spaces, common receipt
+ * delimiters, and newlines to produce "lines" the extraction logic can work with.
+ */
+function normaliseOcrText(raw: string): string[] {
+  // First split on actual newlines
+  let lines = raw.split('\n');
+
+  // If we got very few lines, the text is probably one long string —
+  // split on runs of 2+ spaces which often separate receipt fields
+  if (lines.length <= 3) {
+    lines = raw.split(/\s{2,}|\n/);
+  }
+
+  return lines.map((l) => l.trim()).filter((l) => l.length > 0);
 }
 
 export function parseReceiptText(text: string): OcrResult {
@@ -110,15 +134,31 @@ export function parseReceiptText(text: string): OcrResult {
     rawText: text,
   };
 
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = normaliseOcrText(text);
   if (lines.length === 0) return result;
 
-  const vendorLine = lines.find((l) => l.length > 2 && !/^\d/.test(l) && !/total|vat|tax|change|card/i.test(l));
-  if (vendorLine) {
-    result.vendor = vendorLine.slice(0, 50);
-    result.confidence.vendor = 0.6;
+  // --- Vendor ---
+  // Try the first line(s) that look like a business name:
+  // not a number, not a keyword, not a date, not a price
+  const skipWords = /total|subtotal|vat|tax|change|card|cash|visa|mastercard|payment|balance|due|tendered|receipt|order|thank/i;
+  const looksLikePrice = /^[£$€]?\s*\d+\.\d{2}$/;
+  const looksLikeDate = /^\d{1,2}[\/\-.]?\d{1,2}[\/\-.]?\d{2,4}$/;
+
+  for (const line of lines) {
+    if (
+      line.length > 2 &&
+      !/^\d/.test(line) &&
+      !skipWords.test(line) &&
+      !looksLikePrice.test(line) &&
+      !looksLikeDate.test(line)
+    ) {
+      result.vendor = line.slice(0, 50);
+      result.confidence.vendor = 0.6;
+      break;
+    }
   }
 
+  // --- Total amount ---
   const totalPatterns = [
     /(?:total|amount\s*due|balance\s*due|grand\s*total)\s*[:\s£$€]?\s*([\d,]+\.?\d*)/i,
     /(?:total|amount)\s*[:]\s*[£$€]?\s*([\d,]+\.?\d*)/i,
@@ -149,6 +189,7 @@ export function parseReceiptText(text: string): OcrResult {
     }
   }
 
+  // --- VAT ---
   const vatPattern = /(?:vat|tax)\s*[:\s£$€]?\s*([\d,]+\.?\d*)/i;
   const vatMatch = text.match(vatPattern);
   if (vatMatch) {
@@ -159,6 +200,7 @@ export function parseReceiptText(text: string): OcrResult {
     }
   }
 
+  // --- Date ---
   const datePatterns = [
     { regex: /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/, format: 'dmy' },
     { regex: /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/, format: 'ymd' },

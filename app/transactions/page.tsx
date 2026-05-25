@@ -664,6 +664,8 @@ function TransactionModal({
                   const result = await recognizeReceipt(file, (p) => {
                     if (p.status === 'downloading') {
                       setScanStatus(p.progress != null ? `Loading model ${Math.round(p.progress)}%` : 'Loading model...');
+                    } else if (p.status === 'initialising') {
+                      setScanStatus('Starting model...');
                     } else if (p.status === 'scanning') {
                       setScanStatus('Scanning...');
                     }
