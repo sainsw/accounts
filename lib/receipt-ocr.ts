@@ -13,9 +13,36 @@ export type OcrResult = {
 };
 
 export type OcrProgress = {
-  status: 'downloading' | 'initialising' | 'scanning' | 'ready';
-  progress?: number;
+  status: 'loading' | 'downloading' | 'initialising' | 'processing' | 'extracting';
+  label: string;
 };
+
+// ── Tesseract (default) ─────────────────────────────────────────────
+
+let tesseractWorker: unknown = null;
+
+async function getWorker() {
+  if (tesseractWorker) return tesseractWorker;
+
+  const Tesseract = await import('tesseract.js');
+  const worker = await Tesseract.createWorker('eng');
+  tesseractWorker = worker;
+  return worker;
+}
+
+async function recognizeWithTesseract(
+  imageData: string | File,
+  onProgress?: (p: OcrProgress) => void,
+): Promise<OcrResult> {
+  onProgress?.({ status: 'loading', label: 'Starting OCR engine...' });
+  const worker = await getWorker() as { recognize: (img: string | File) => Promise<{ data: { text: string } }> };
+  onProgress?.({ status: 'processing', label: 'Reading receipt...' });
+  const { data: { text } } = await worker.recognize(imageData);
+  onProgress?.({ status: 'extracting', label: 'Extracting details...' });
+  return parseReceiptText(text);
+}
+
+// ── Florence-2 (experimental) ───────────────────────────────────────
 
 const MODEL_ID = 'onnx-community/Florence-2-base-ft';
 
@@ -35,22 +62,20 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
       AutoTokenizer,
     } = await import('@huggingface/transformers');
 
-    onProgress?.({ status: 'downloading', progress: 0 });
+    onProgress?.({ status: 'downloading', label: 'Downloading vision model...' });
 
     const [model, processor, tokenizer] = await Promise.all([
       Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, {
         dtype: {
-          embed_tokens: 'q4',
-          vision_encoder: 'q4',
-          encoder_model: 'q4',
+          embed_tokens: 'fp32',
+          vision_encoder: 'fp32',
+          encoder_model: 'fp32',
           decoder_model_merged: 'q4',
         },
         progress_callback: (p: any) => {
           if (p.status === 'progress' && typeof p.progress === 'number') {
-            onProgress?.({ status: 'downloading', progress: p.progress });
-          }
-          if (p.status === 'ready') {
-            onProgress?.({ status: 'initialising' });
+            const pct = Math.round(p.progress);
+            onProgress?.({ status: 'downloading', label: `Downloading vision model... ${pct}%` });
           }
         },
       }),
@@ -59,7 +84,6 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
     ]);
 
     cached = { model, processor, tokenizer };
-    onProgress?.({ status: 'ready' });
     return cached;
   })();
 
@@ -67,7 +91,7 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
   return loading!;
 }
 
-export async function recognizeReceipt(
+async function recognizeWithFlorence(
   imageData: string | File,
   onProgress?: (p: OcrProgress) => void,
 ): Promise<OcrResult> {
@@ -75,11 +99,13 @@ export async function recognizeReceipt(
   const bundle = await getModel(onProgress);
   const { model, processor, tokenizer } = bundle;
 
-  onProgress?.({ status: 'scanning' });
+  onProgress?.({ status: 'initialising', label: 'Warming up model...' });
 
   const image = imageData instanceof File
     ? await RawImage.fromBlob(imageData)
     : await RawImage.read(imageData);
+
+  onProgress?.({ status: 'processing', label: 'Analysing receipt...' });
 
   const task = '<OCR>';
   const inputs = await processor(image, task);
@@ -88,6 +114,8 @@ export async function recognizeReceipt(
     ...inputs,
     max_new_tokens: 1024,
   });
+
+  onProgress?.({ status: 'extracting', label: 'Extracting text...' });
 
   const generatedText = tokenizer.batch_decode(generatedIds, {
     skip_special_tokens: false,
@@ -100,11 +128,26 @@ export async function recognizeReceipt(
   );
 
   const text: string = result[task] ?? generatedText;
-  if (typeof window !== 'undefined') {
-    console.log('[receipt-ocr] raw text:', JSON.stringify(text));
-  }
   return parseReceiptText(text);
 }
+
+// ── Public API ──────────────────────────────────────────────────────
+
+export async function recognizeReceipt(
+  imageData: string | File,
+  options?: {
+    experimental?: boolean;
+    onProgress?: (p: OcrProgress) => void;
+  },
+): Promise<OcrResult> {
+  const { experimental = false, onProgress } = options ?? {};
+  if (experimental) {
+    return recognizeWithFlorence(imageData, onProgress);
+  }
+  return recognizeWithTesseract(imageData, onProgress);
+}
+
+// ── Text parsing ────────────────────────────────────────────────────
 
 /**
  * Florence-2 OCR often returns text as a single continuous string rather than
@@ -112,7 +155,6 @@ export async function recognizeReceipt(
  * delimiters, and newlines to produce "lines" the extraction logic can work with.
  */
 function normaliseOcrText(raw: string): string[] {
-  // First split on actual newlines
   let lines = raw.split('\n');
 
   // If we got very few lines, the text is probably one long string —
@@ -138,8 +180,6 @@ export function parseReceiptText(text: string): OcrResult {
   if (lines.length === 0) return result;
 
   // --- Vendor ---
-  // Try the first line(s) that look like a business name:
-  // not a number, not a keyword, not a date, not a price
   const skipWords = /total|subtotal|vat|tax|change|card|cash|visa|mastercard|payment|balance|due|tendered|receipt|order|thank/i;
   const looksLikePrice = /^[£$€]?\s*\d+\.\d{2}$/;
   const looksLikeDate = /^\d{1,2}[\/\-.]?\d{1,2}[\/\-.]?\d{2,4}$/;

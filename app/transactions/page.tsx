@@ -8,6 +8,17 @@ import { cn, formatCurrency, formatDate, todayString } from '@/lib/utils';
 import { calculateVatAmount } from '@/lib/vat';
 import { exportTransactionsCSV, downloadCsv } from '@/lib/export';
 import { recognizeReceipt, type OcrResult, type OcrProgress } from '@/lib/receipt-ocr';
+
+function ScanProgressBar({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative h-1.5 w-16 overflow-hidden rounded-full bg-brand-100 dark:bg-brand-500/20">
+        <div className="animate-scan-bar absolute inset-y-0 w-1/3 rounded-full bg-brand-500" />
+      </div>
+      <span className="text-xs text-brand-600 dark:text-brand-400">{label}</span>
+    </div>
+  );
+}
 import { suggestRuleFromRecategorisation } from '@/lib/smart-categorisation';
 import { useUndo } from '@/lib/undo-context';
 import type { Transaction, TransactionType, Attachment, CostCategoryMeta } from '@/lib/types';
@@ -459,12 +470,13 @@ function TransactionModal({
     currencySymbol: string;
     vatRegistered: boolean;
     costCategoryMeta?: CostCategoryMeta[];
+    experimentalReceiptScanning?: boolean;
   };
   clients: { id: string; name: string }[];
   onSave: (data: FormData) => void;
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
-  const [scanStatus, setScanStatus] = useState<string | null>(null);
+  const [scanLabel, setScanLabel] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<OcrResult | null>(null);
 
   const handleOpen = useCallback(() => {
@@ -654,21 +666,16 @@ function TransactionModal({
             <input type="file" accept="image/*,.pdf" multiple onChange={handleFileUpload}
               className="block w-full text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-700 dark:file:text-slate-300" />
             <label className="shrink-0 cursor-pointer rounded-lg border border-dashed border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/40 dark:text-brand-400 dark:hover:bg-brand-500/10">
-              {scanStatus || 'Scan Receipt'}
-              <input type="file" accept="image/*" className="hidden" disabled={!!scanStatus} onChange={async (e) => {
+              {scanLabel ? <ScanProgressBar label={scanLabel} /> : 'Scan Receipt'}
+              <input type="file" accept="image/*" className="hidden" disabled={!!scanLabel} onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setScanStatus('Loading...');
+                setScanLabel('Preparing...');
                 setScanResult(null);
                 try {
-                  const result = await recognizeReceipt(file, (p) => {
-                    if (p.status === 'downloading') {
-                      setScanStatus(p.progress != null ? `Loading model ${Math.round(p.progress)}%` : 'Loading model...');
-                    } else if (p.status === 'initialising') {
-                      setScanStatus('Starting model...');
-                    } else if (p.status === 'scanning') {
-                      setScanStatus('Scanning...');
-                    }
+                  const result = await recognizeReceipt(file, {
+                    experimental: settings.experimentalReceiptScanning ?? false,
+                    onProgress: (p) => setScanLabel(p.label),
                   });
                   setScanResult(result);
                   if (result.totalAmount && result.confidence.totalAmount > 0.3) {
@@ -698,7 +705,7 @@ function TransactionModal({
                   console.error('Receipt scan failed:', err);
                   alert('Receipt scan failed. Please try a clearer image.');
                 } finally {
-                  setScanStatus(null);
+                  setScanLabel(null);
                 }
               }} />
             </label>

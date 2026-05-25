@@ -51,6 +51,15 @@ select {
   }
 }
 
+/* Scan progress animation */
+@keyframes scan-bar {
+  0% { left: -33%; }
+  100% { left: 100%; }
+}
+.animate-scan-bar {
+  animation: scan-bar 1.2s ease-in-out infinite;
+}
+
 /* Print styles */
 @media print {
   body {

@@ -180,6 +180,14 @@ export default function SettingsPage() {
               </label>
               <span className="text-xs text-slate-500">Increases text and border contrast for better readability</span>
             </div>
+            <div className="sm:col-span-2 flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={settings.experimentalReceiptScanning ?? false} onChange={(e) => { set('experimentalReceiptScanning', e.target.checked); flash(); }}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500" />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Experimental Receipt Scanning</span>
+              </label>
+              <span className="text-xs text-slate-500">Uses an AI vision model for better accuracy (downloads ~500MB on first use)</span>
+            </div>
           </div>
         </Card>
 

@@ -239,6 +239,7 @@ export type Settings = {
   invoicing: InvoicingSettings;
   logoData: string | null;
   highContrast?: boolean;
+  experimentalReceiptScanning?: boolean;
 };
 
 export type BackupData = {
