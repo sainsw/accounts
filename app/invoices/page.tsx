@@ -168,12 +168,12 @@ function InvoicesContent() {
         title="Invoices"
         description="Track and manage your invoices"
         actions={
-          <div className="flex gap-2">
+          <>
             <Button variant="secondary" onClick={() => setShowImporter((v) => !v)}>
               <UploadIcon /> Import PDFs
             </Button>
             <Button onClick={openNew}><PlusIcon /> New Invoice</Button>
-          </div>
+          </>
         }
       />
 

@@ -125,7 +125,7 @@ function TransactionsContent() {
         title="Transactions"
         description={`${transactions.length} total transactions`}
         actions={
-          <div className="flex gap-2">
+          <>
             {transactions.length > 0 && (
               <Button variant="secondary" onClick={() => {
                 const csv = exportTransactionsCSV(filtered, settings);
@@ -138,7 +138,7 @@ function TransactionsContent() {
               <PlusIcon />
               Add Transaction
             </Button>
-          </div>
+          </>
         }
       />
 

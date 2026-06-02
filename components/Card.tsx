@@ -39,7 +39,11 @@ export function PageHeader({
           </p>
         )}
       </div>
-      {actions && <div className="flex gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex w-full gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

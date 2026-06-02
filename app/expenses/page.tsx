@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, PageHeader, StatCard } from '@/components/Card';
-import { Modal } from '@/components/Modal';
+import { Button, Modal } from '@/components/Modal';
 import { formatCurrency, getYearRange, getFinancialYear, generateId, todayString } from '@/lib/utils';
 import { calculateMileageAllowance, calculateWorkingFromHomeAllowance } from '@/lib/simplified-expenses';
 import { exportMileageCSV, downloadCsv } from '@/lib/export';
@@ -145,7 +145,33 @@ export default function ExpensesPage() {
 
   return (
     <>
-      <PageHeader title="Simplified Expenses" description="Mileage allowance and working from home claims" />
+      <PageHeader
+        title="Mileage & Working from Home"
+        description="Claim HMRC flat-rate allowances (&ldquo;simplified expenses&rdquo;) instead of adding up actual costs."
+        actions={
+          <>
+            {tab === 'mileage' && yearMileage.length > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const csv = exportMileageCSV(yearMileage);
+                  downloadCsv(csv, `mileage-${selectedYear}.csv`);
+                }}
+              >
+                Export CSV
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                if (tab === 'mileage') { setMileageForm(emptyMileageForm); setEditingMileage(null); setShowMileageModal(true); }
+                else { setWfhForm(emptyWfhForm); setEditingWfh(null); setShowWfhModal(true); }
+              }}
+            >
+              + Add {tab === 'mileage' ? 'Journey' : 'Month'}
+            </Button>
+          </>
+        }
+      />
 
       <div className="mb-4 grid grid-cols-3 gap-4">
         <StatCard label="Total Miles" value={totalMiles.toLocaleString()} color="blue" />
@@ -153,7 +179,7 @@ export default function ExpensesPage() {
         <StatCard label="WFH Allowance" value={formatCurrency(totalWfhAllowance, sym)} color="green" />
       </div>
 
-      <div className="mb-4 flex items-center gap-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex rounded-lg border border-slate-200 dark:border-slate-700">
           <button onClick={() => setTab('mileage')} className={`px-4 py-2 text-sm font-medium rounded-l-lg ${tab === 'mileage' ? 'bg-brand-500 text-white' : 'text-slate-600 dark:text-slate-400'}`}>
             Mileage
@@ -167,28 +193,6 @@ export default function ExpensesPage() {
             <option key={y} value={y}>{y}{settings.taxYear !== 'calendar' ? `/${(y + 1).toString().slice(2)}` : ''}</option>
           ))}
         </select>
-        <div className="ml-auto flex gap-2">
-          {tab === 'mileage' && yearMileage.length > 0 && (
-            <button
-              onClick={() => {
-                const csv = exportMileageCSV(yearMileage);
-                downloadCsv(csv, `mileage-${selectedYear}.csv`);
-              }}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              Export CSV
-            </button>
-          )}
-          <button
-            onClick={() => {
-              if (tab === 'mileage') { setMileageForm(emptyMileageForm); setEditingMileage(null); setShowMileageModal(true); }
-              else { setWfhForm(emptyWfhForm); setEditingWfh(null); setShowWfhModal(true); }
-            }}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            + Add {tab === 'mileage' ? 'Journey' : 'Month'}
-          </button>
-        </div>
       </div>
 
       {tab === 'mileage' && (

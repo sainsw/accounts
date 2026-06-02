@@ -28,7 +28,7 @@ export const primaryNavItems: NavItem[] = [
   { href: '/transactions', label: 'Money in & out', short: 'Money', icon: TransactionsIcon },
   { href: '/invoices', label: 'Invoices', icon: InvoicesIcon },
   { href: '/clients', label: 'Clients', icon: ClientsIcon },
-  { href: '/expenses', label: 'Expenses', icon: ExpensesIcon },
+  { href: '/expenses', label: 'Mileage & WFH', icon: ExpensesIcon },
 ];
 
 // Secondary / occasional destinations.
@@ -50,7 +50,7 @@ export const mobileTabItems: NavItem[] = [
 
 export const mobileMoreItems: NavItem[] = [
   { href: '/clients', label: 'Clients', icon: ClientsIcon },
-  { href: '/expenses', label: 'Expenses', icon: ExpensesIcon },
+  { href: '/expenses', label: 'Mileage & WFH', icon: ExpensesIcon },
   { href: '/projects', label: 'Projects', icon: ProjectsIcon },
   { href: '/budgets', label: 'Budgets', icon: BudgetsIcon },
   { href: '/import', label: 'Import', icon: ImportIcon },
