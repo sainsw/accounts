@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
@@ -48,7 +49,18 @@ const emptyForm = (): FormData => ({
 });
 
 export default function TransactionsPage() {
+  return (
+    <Suspense>
+      <TransactionsContent />
+    </Suspense>
+  );
+}
+
+function TransactionsContent() {
   const { ready, settings, transactions, clients, invoices, addTransaction, updateTransaction, deleteTransaction, deleteInvoice, updateInvoice, categorisationRules, addRule } = useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const newHandled = useRef(false);
   const undoStack = useUndo();
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
   const [ruleSuggestion, setRuleSuggestion] = useState<{ pattern: string; category: string; type: TransactionType; count: number } | null>(null);
@@ -93,6 +105,17 @@ export default function TransactionsPage() {
 
   const openNew = useCallback(() => { setEditing(null); setModalOpen(true); }, []);
   const openEdit = useCallback((t: Transaction) => { setEditing(t); setModalOpen(true); }, []);
+
+  // Open the new-transaction form when arriving via the global "+ New" menu.
+  useEffect(() => {
+    if (!ready || newHandled.current) return;
+    if (searchParams.get('new') === '1') {
+      newHandled.current = true;
+      setEditing(null);
+      setModalOpen(true);
+      router.replace('/transactions');
+    }
+  }, [ready, searchParams, router]);
 
   if (!ready) return null;
 

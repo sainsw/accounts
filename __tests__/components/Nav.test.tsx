@@ -27,8 +27,8 @@ import { useApp } from '@/lib/context';
 describe('Nav', () => {
   it('renders all base navigation links', () => {
     render(<Nav />);
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Transactions')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
+    expect(screen.getByText('Money in & out')).toBeInTheDocument();
     expect(screen.getByText('Clients')).toBeInTheDocument();
     expect(screen.getByText('Invoices')).toBeInTheDocument();
     expect(screen.getByText('Reports')).toBeInTheDocument();
@@ -57,10 +57,10 @@ describe('Nav', () => {
       settings: { vatRegistered: false },
     } as any);
     render(<Nav />);
-    const txLink = screen.getByText('Transactions').closest('a');
+    const txLink = screen.getByText('Money in & out').closest('a');
     expect(txLink!.className).toContain('bg-brand-50');
-    // Dashboard should not be active
-    const dashLink = screen.getByText('Dashboard').closest('a');
+    // Home should not be active
+    const dashLink = screen.getByText('Home').closest('a');
     expect(dashLink!.className).not.toContain('bg-brand-50');
   });
 
@@ -70,8 +70,8 @@ describe('Nav', () => {
     } as any);
     mockPathname.mockReturnValue('/');
     render(<Nav />);
-    expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/');
-    expect(screen.getByText('Transactions').closest('a')).toHaveAttribute('href', '/transactions');
+    expect(screen.getByText('Home').closest('a')).toHaveAttribute('href', '/');
+    expect(screen.getByText('Money in & out').closest('a')).toHaveAttribute('href', '/transactions');
     expect(screen.getByText('Clients').closest('a')).toHaveAttribute('href', '/clients');
     expect(screen.getByText('Invoices').closest('a')).toHaveAttribute('href', '/invoices');
     expect(screen.getByText('VAT').closest('a')).toHaveAttribute('href', '/vat');

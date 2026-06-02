@@ -82,6 +82,14 @@ function InvoicesContent() {
 
   useEffect(() => {
     if (!ready || importProcessed.current) return;
+    // Open a blank invoice form when arriving via the global "+ New" menu.
+    if (searchParams.get('new') === '1') {
+      importProcessed.current = true;
+      setEditing(null);
+      setModalOpen(true);
+      router.replace('/invoices');
+      return;
+    }
     const raw = searchParams.get('import');
     if (!raw) return;
     importProcessed.current = true;

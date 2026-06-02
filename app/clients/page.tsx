@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
@@ -20,7 +21,18 @@ const emptyForm = (): FormData => ({
 });
 
 export default function ClientsPage() {
+  return (
+    <Suspense>
+      <ClientsContent />
+    </Suspense>
+  );
+}
+
+function ClientsContent() {
   const { ready, settings, clients, transactions, invoices, addClient, updateClient, deleteClient } = useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const newHandled = useRef(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [search, setSearch] = useState('');
@@ -61,6 +73,17 @@ export default function ClientsPage() {
     setEditing(c);
     setModalOpen(true);
   }, []);
+
+  // Open the new-client form when arriving via the global "+ New" menu.
+  useEffect(() => {
+    if (!ready || newHandled.current) return;
+    if (searchParams.get('new') === '1') {
+      newHandled.current = true;
+      setEditing(null);
+      setModalOpen(true);
+      router.replace('/clients');
+    }
+  }, [ready, searchParams, router]);
 
   if (!ready) return null;
 

@@ -3,13 +3,14 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
+import { TransactionsIcon, ClientsIcon, InvoicesIcon, type IconProps } from '@/components/nav-shared';
 import { formatCurrency, formatDate, formatMonth, getYearRange, isInRange, monthString, getFinancialYear, todayString, generateId } from '@/lib/utils';
 import { calculateUKTax, calculateFlatTax } from '@/lib/tax';
 import { generateTaxHints, suggestCategory } from '@/lib/smart-categorisation';
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const { ready, settings, transactions, invoices, updateSettings, mileageEntries, wfhEntries, addTransaction, categorisationRules, updateTransaction } = useApp();
+  const { ready, settings, transactions, invoices, clients, updateSettings, mileageEntries, wfhEntries, addTransaction, categorisationRules, updateTransaction } = useApp();
   const [backupDismissed, setBackupDismissed] = useState(false);
   const [dismissedHints, setDismissedHints] = useState<string[]>([]);
   const [quickDesc, setQuickDesc] = useState('');
@@ -164,6 +165,12 @@ export default function Dashboard() {
   }, [settings.lastExportDate, stats.unreconciledCount, stats.overdueCount]);
 
   if (!ready) return null;
+
+  // Brand-new account: a guided home beats a wall of £0 stats. This melts away
+  // automatically as soon as the first transaction is recorded.
+  if (transactions.length === 0) {
+    return <GettingStarted hasClients={clients.length > 0} hasInvoices={invoices.length > 0} />;
+  }
 
   const sym = settings.currencySymbol || '$';
   const locale = settings.locale || 'en-US';
@@ -492,5 +499,112 @@ export default function Dashboard() {
         </Card>
       </div>
     </>
+  );
+}
+
+function GettingStarted({ hasClients, hasInvoices }: { hasClients: boolean; hasInvoices: boolean }) {
+  return (
+    <>
+      <PageHeader
+        title="Welcome 👋"
+        description="You're all set up. Here's how to get going — pick whatever you need first."
+      />
+
+      <Card className="mb-6 bg-brand-50/60 dark:bg-brand-500/10">
+        <p className="text-sm text-slate-700 dark:text-slate-200">
+          This is your <strong>Home</strong> screen. Once you start recording money coming in and
+          going out, it fills up with your totals, estimated tax and recent activity. Nothing to set
+          up first — just add your first entry below.
+        </p>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StartCard
+          icon={TransactionsIcon}
+          title="Record money in or out"
+          body="Log income you've received or something you paid for. Start here — it's the heart of the app."
+          cta="Add your first entry"
+          href="/transactions?new=1"
+          primary
+          done={false}
+        />
+        <StartCard
+          icon={ClientsIcon}
+          title="Add a client"
+          body="Save the people or companies you work for so you can link income and invoices to them."
+          cta={hasClients ? 'Add another client' : 'Add a client'}
+          href="/clients?new=1"
+          done={hasClients}
+        />
+        <StartCard
+          icon={InvoicesIcon}
+          title="Create an invoice"
+          body="Bill a client and keep track of what's been paid and what's still outstanding."
+          cta={hasInvoices ? 'Create another invoice' : 'Create an invoice'}
+          href="/invoices?new=1"
+          done={hasInvoices}
+        />
+      </div>
+
+      <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+        Everything lives in the menu — Money in &amp; out, Invoices, Clients, Expenses and more. You
+        can change currency, tax and other details anytime in Settings.
+      </p>
+    </>
+  );
+}
+
+function StartCard({
+  icon: Icon,
+  title,
+  body,
+  cta,
+  href,
+  primary = false,
+  done = false,
+}: {
+  icon: React.ComponentType<IconProps>;
+  title: string;
+  body: string;
+  cta: string;
+  href: string;
+  primary?: boolean;
+  done?: boolean;
+}) {
+  return (
+    <Card className={primary ? 'border-brand-300 dark:border-brand-500/40' : undefined}>
+      <div className="flex h-full flex-col">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
+            <Icon className="h-5 w-5" />
+          </span>
+          {done && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+              <CheckIcon className="h-3 w-3" /> Done
+            </span>
+          )}
+        </div>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+        <p className="mt-1 flex-1 text-xs text-slate-500 dark:text-slate-400">{body}</p>
+        <Link
+          href={href}
+          className={
+            primary
+              ? 'mt-4 inline-flex items-center justify-center rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-600'
+              : 'mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700'
+          }
+        >
+          {cta}
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
+function CheckIcon({ className }: IconProps) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
   );
 }

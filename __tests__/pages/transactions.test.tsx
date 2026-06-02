@@ -10,6 +10,11 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>,
 }));
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
 vi.mock('@/lib/export', () => ({
   exportTransactionsCSV: vi.fn(() => 'csv-data'),
   downloadCsv: vi.fn(),

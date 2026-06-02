@@ -56,7 +56,7 @@ describe('Dashboard', () => {
   });
 
   it('renders current month stat cards', () => {
-    setup({ transactions: [] });
+    setup({ transactions: [createTransaction()] });
     render(<Dashboard />);
     expect(screen.getByText('Est. Tax')).toBeInTheDocument();
     expect(screen.getByText('After Tax')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('Dashboard', () => {
       createInvoice({ status: 'sent', amount: 1000 }),
       createInvoice({ status: 'overdue', amount: 500 }),
     ];
-    setup({ invoices });
+    setup({ invoices, transactions: [createTransaction()] });
     render(<Dashboard />);
     expect(screen.getByText('Outstanding')).toBeInTheDocument();
     expect(screen.getByText(/2 invoices/)).toBeInTheDocument();
@@ -121,15 +121,18 @@ describe('Dashboard', () => {
     expect(screen.queryByText('Transaction 0')).not.toBeInTheDocument(); // oldest, beyond 8
   });
 
-  it('shows empty state when no transactions exist', () => {
+  it('shows the getting-started guide when no transactions exist', () => {
     setup({ transactions: [] });
     render(<Dashboard />);
-    expect(screen.getByText('No transactions yet')).toBeInTheDocument();
+    expect(screen.getByText('Record money in or out')).toBeInTheDocument();
+    // The zero-value stat cards should not be shown to a brand-new user.
+    expect(screen.queryByText('Est. Tax')).not.toBeInTheDocument();
   });
 
   it('shows VAT summary card when VAT registered', () => {
     setup({
       settings: createSettings({ vatRegistered: true }),
+      transactions: [createTransaction()],
     });
     render(<Dashboard />);
     expect(screen.getByText('View VAT Return')).toBeInTheDocument();
@@ -138,6 +141,7 @@ describe('Dashboard', () => {
   it('hides VAT summary card when not VAT registered', () => {
     setup({
       settings: createSettings({ vatRegistered: false }),
+      transactions: [createTransaction()],
     });
     render(<Dashboard />);
     expect(screen.queryByText('View VAT Return')).not.toBeInTheDocument();
