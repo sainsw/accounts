@@ -19,7 +19,8 @@ vi.mock('@/lib/invoice-pdf-adapter', () => ({
   downloadInvoicePdf: vi.fn(),
 }));
 
-vi.mock('@/lib/invoice-utils', () => ({
+vi.mock('@/lib/invoice-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/invoice-utils')>()),
   computeInvoiceTotals: vi.fn(() => ({
     workSubtotal: 0,
     expensesSubtotal: 0,

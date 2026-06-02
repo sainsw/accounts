@@ -591,8 +591,11 @@ function InvoiceModal({
         setForm(rest);
         setItemized(!!(rest.workBlocks?.length || rest.expenses?.length));
       } else {
-        setForm(emptyForm());
-        setItemized(false);
+        // New invoice: default to itemised with a starter work block.
+        const blank = emptyForm();
+        blank.workBlocks = [newWorkBlock(settings.invoicing?.defaultDailyRate || 0)];
+        setForm(blank);
+        setItemized(true);
       }
     }
   }, [open, editing, importData]);
