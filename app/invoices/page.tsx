@@ -660,7 +660,7 @@ function InvoiceModal({
   return (
     <Modal open={open} onClose={onClose} title={importData ? 'Import from Invoicer' : editing ? 'Edit Invoice' : 'Track Invoice'} wide={itemized}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Invoice # *</span>
             <input type="text" value={form.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)}
@@ -683,7 +683,7 @@ function InvoiceModal({
 
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Client *</span>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
             <select
               value={form.clientId ?? ''}
               onChange={(e) => {
@@ -701,7 +701,7 @@ function InvoiceModal({
           </div>
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Issue Date</span>
             <input type="date" value={form.issueDate} onChange={(e) => set('issueDate', e.target.value)} className={inputCls} />

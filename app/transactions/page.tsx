@@ -575,7 +575,7 @@ function TransactionModal({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Date</span>
             <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)}
@@ -602,7 +602,7 @@ function TransactionModal({
             placeholder="What was this for?" />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</span>
             <select value={form.category} onChange={(e) => {
@@ -651,7 +651,7 @@ function TransactionModal({
 
         {/* VAT rate selector */}
         {settings.vatRegistered && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-300">VAT Rate</span>
               <select value={form.vatRate ?? ''} onChange={(e) => {
