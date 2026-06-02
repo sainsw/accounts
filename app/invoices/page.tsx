@@ -537,7 +537,36 @@ function InvoicesContent() {
               });
             }
           } else {
-            addInvoice(data);
+            const newId = addInvoice(data);
+            if (data.status === 'paid') {
+              const parts: string[] = [];
+              const inv = { ...data, id: newId } as TrackedInvoice;
+              if (inv.workBlocks?.length) {
+                parts.push(...inv.workBlocks.filter((wb) => wb.description).map((wb) =>
+                  `${wb.description} ${sym}${wb.blockTotal.toFixed(2)}`
+                ));
+              }
+              if (inv.expenses?.length) {
+                const expTotal = inv.expenses.reduce((s, e) => s + e.amount, 0);
+                if (expTotal > 0) parts.push(`Expenses ${sym}${expTotal.toFixed(2)}`);
+              }
+              const client = clients.find((c) => c.id === data.clientId);
+              const attachment = getInvoicePdfAttachment(inv, settings, client);
+              addTransaction({
+                date: data.paidDate || todayString(),
+                type: 'income',
+                amount: data.amount,
+                description: `Invoice #${data.invoiceNumber}`,
+                category: settings.incomeCategories?.[0] || 'Consulting',
+                clientId: data.clientId || null,
+                invoiceId: newId,
+                notes: parts.join(', '),
+                vatRate: null,
+                vatAmount: 0,
+                taxDeductible: true,
+                attachments: [attachment],
+              });
+            }
           }
           setModalOpen(false);
         }}
@@ -568,6 +597,7 @@ function InvoiceModal({
   const [form, setForm] = useState<FormData>(emptyForm);
   const [itemized, setItemized] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [autoDownloadPdf, setAutoDownloadPdf] = useState(true);
 
   useMemo(() => {
     if (open) {
@@ -654,6 +684,16 @@ function InvoiceModal({
       delete finalForm.purchaseOrder;
     }
     onSave(finalForm);
+    // Download a PDF copy on save (new invoices only) so the user doesn't
+    // have to reopen the invoice just to grab the PDF.
+    if (!editing && autoDownloadPdf) {
+      const client = clients.find((c) => c.id === finalForm.clientId);
+      try {
+        downloadInvoicePdf({ ...finalForm, id: 'new' } as TrackedInvoice, settings, client);
+      } catch {
+        // PDF generation failed — saving still succeeded, so don't block.
+      }
+    }
   };
 
   const defaultRate = settings.invoicing?.defaultDailyRate || 0;
@@ -861,6 +901,20 @@ function InvoiceModal({
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</span>
           <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} className={inputCls} />
         </label>
+
+        {!editing && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoDownloadPdf}
+              onChange={(e) => setAutoDownloadPdf(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+            />
+            <span className="text-sm text-slate-700 dark:text-slate-300">
+              Automatically download a PDF copy when I save
+            </span>
+          </label>
+        )}
 
         <div className="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
           <div>
