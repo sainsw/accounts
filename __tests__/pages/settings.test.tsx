@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { createSettings } from '../test-helpers';
@@ -7,7 +8,7 @@ vi.mock('@/lib/context', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>,
+  default: ({ href, children, ...props }: ComponentProps<'a'>) => <a href={href} {...props}>{children}</a>,
 }));
 
 vi.mock('@/lib/export', () => ({
@@ -52,7 +53,7 @@ const baseContext = {
 };
 
 function setup(overrides: Partial<typeof baseContext> = {}) {
-  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as any);
+  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as unknown as ReturnType<typeof useApp>);
 }
 
 describe('SettingsPage', () => {
@@ -125,7 +126,7 @@ describe('SettingsPage', () => {
     vi.mocked(useApp).mockReturnValue({
       ...baseContext,
       settings: createSettings({ vatRegistered: true }),
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
     rerender(<SettingsPage />);
     expect(screen.getByText('VAT Scheme')).toBeInTheDocument();
   });

@@ -17,7 +17,8 @@ export default function Dashboard() {
   const [quickAmount, setQuickAmount] = useState('');
   const [quickType, setQuickType] = useState<'income' | 'cost'>('cost');
 
-  const today = new Date().toISOString().split('T')[0];
+  const [now] = useState(Date.now);
+  const today = new Date(now).toISOString().split('T')[0];
   const currentYear = getFinancialYear(today, settings.taxYear);
   const yearRange = getYearRange(currentYear, settings.taxYear);
   const curMonth = monthString();
@@ -152,7 +153,7 @@ export default function Dashboard() {
   // Health check
   const healthCheck = useMemo(() => {
     const issues: { label: string; severity: 'warning' | 'info'; href: string }[] = [];
-    if (!settings.lastExportDate || ((Date.now() - new Date(settings.lastExportDate).getTime()) / 86400000) >= 30) {
+    if (!settings.lastExportDate || ((now - new Date(settings.lastExportDate).getTime()) / 86400000) >= 30) {
       issues.push({ label: 'Backup overdue', severity: 'warning', href: '/settings' });
     }
     if (stats.unreconciledCount > 0) {
@@ -178,12 +179,12 @@ export default function Dashboard() {
   const showBackupReminder = !backupDismissed && (() => {
     if (!settings.lastExportDate) return transactions.length > 0;
     const lastExport = new Date(settings.lastExportDate);
-    const daysSince = Math.floor((Date.now() - lastExport.getTime()) / (1000 * 60 * 60 * 24));
+    const daysSince = Math.floor((now - lastExport.getTime()) / (1000 * 60 * 60 * 24));
     return daysSince >= 30;
   })();
 
   const daysSinceExport = settings.lastExportDate
-    ? Math.floor((Date.now() - new Date(settings.lastExportDate).getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor((now - new Date(settings.lastExportDate).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
   return (

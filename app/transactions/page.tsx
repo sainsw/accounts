@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
@@ -60,7 +60,6 @@ function TransactionsContent() {
   const { ready, settings, transactions, clients, invoices, addTransaction, updateTransaction, deleteTransaction, deleteInvoice, updateInvoice, categorisationRules, addRule } = useApp();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const newHandled = useRef(false);
   const undoStack = useUndo();
   const [confirmDeleteTx, setConfirmDeleteTx] = useState<Transaction | null>(null);
   const [ruleSuggestion, setRuleSuggestion] = useState<{ pattern: string; category: string; type: TransactionType; count: number } | null>(null);
@@ -107,15 +106,18 @@ function TransactionsContent() {
   const openEdit = useCallback((t: Transaction) => { setEditing(t); setModalOpen(true); }, []);
 
   // Open the new-transaction form when arriving via the global "+ New" menu.
-  useEffect(() => {
-    if (!ready || newHandled.current) return;
-    if (searchParams.get('new') === '1') {
-      newHandled.current = true;
+  const wantsNew = ready && searchParams.get('new') === '1';
+  const [prevWantsNew, setPrevWantsNew] = useState(false);
+  if (wantsNew !== prevWantsNew) {
+    setPrevWantsNew(wantsNew);
+    if (wantsNew) {
       setEditing(null);
       setModalOpen(true);
-      router.replace('/transactions');
     }
-  }, [ready, searchParams, router]);
+  }
+  useEffect(() => {
+    if (wantsNew) router.replace('/transactions');
+  }, [wantsNew, router]);
 
   if (!ready) return null;
 

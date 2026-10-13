@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -20,9 +20,11 @@ export default function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the sheet whenever the route changes.
-  useEffect(() => {
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setMoreOpen(false);
-  }, [pathname]);
+  }
 
   const moreItems = mobileMoreItems.filter(
     (item) => !item.requiresVat || settings.vatRegistered

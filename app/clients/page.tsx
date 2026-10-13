@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader } from '@/components/Card';
@@ -32,7 +32,6 @@ function ClientsContent() {
   const { ready, settings, clients, transactions, invoices, addClient, updateClient, deleteClient } = useApp();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const newHandled = useRef(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [search, setSearch] = useState('');
@@ -75,15 +74,18 @@ function ClientsContent() {
   }, []);
 
   // Open the new-client form when arriving via the global "+ New" menu.
-  useEffect(() => {
-    if (!ready || newHandled.current) return;
-    if (searchParams.get('new') === '1') {
-      newHandled.current = true;
+  const wantsNew = ready && searchParams.get('new') === '1';
+  const [prevWantsNew, setPrevWantsNew] = useState(false);
+  if (wantsNew !== prevWantsNew) {
+    setPrevWantsNew(wantsNew);
+    if (wantsNew) {
       setEditing(null);
       setModalOpen(true);
-      router.replace('/clients');
     }
-  }, [ready, searchParams, router]);
+  }
+  useEffect(() => {
+    if (wantsNew) router.replace('/clients');
+  }, [wantsNew, router]);
 
   if (!ready) return null;
 
@@ -211,7 +213,10 @@ function ClientModal({
 }) {
   const [form, setForm] = useState<FormData>(emptyForm);
 
-  useMemo(() => {
+  // Reset the form whenever the modal opens or switches to another client.
+  const [synced, setSynced] = useState<{ open: boolean; editing: Client | null } | null>(null);
+  if (synced?.open !== open || synced?.editing !== editing) {
+    setSynced({ open, editing });
     if (open) {
       if (editing) {
         setForm({ name: editing.name, email: editing.email, phone: editing.phone, address: editing.address, notes: editing.notes });
@@ -219,7 +224,7 @@ function ClientModal({
         setForm(emptyForm());
       }
     }
-  }, [open, editing]);
+  }
 
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));

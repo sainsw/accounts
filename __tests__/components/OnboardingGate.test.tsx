@@ -23,7 +23,7 @@ describe('OnboardingGate', () => {
       ready: true,
       onboardingDone: false,
       completeOnboarding,
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
 
     render(<OnboardingGate />);
     expect(screen.getByTestId('setup-wizard')).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe('OnboardingGate', () => {
       ready: true,
       onboardingDone: true,
       completeOnboarding: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
 
     const { container } = render(<OnboardingGate />);
     expect(container.innerHTML).toBe('');
@@ -46,7 +46,7 @@ describe('OnboardingGate', () => {
       ready: true,
       onboardingDone: false,
       completeOnboarding,
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
 
     render(<OnboardingGate />);
     fireEvent.click(screen.getByText('Finish Wizard'));

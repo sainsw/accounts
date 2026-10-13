@@ -135,8 +135,8 @@ function parseQIFDate(raw: string): string | null {
 
   if (parts.length !== 3) return null;
 
-  let a = parseInt(parts[0], 10);
-  let b = parseInt(parts[1], 10);
+  const a = parseInt(parts[0], 10);
+  const b = parseInt(parts[1], 10);
   let c = parseInt(parts[2], 10);
 
   if (isNaN(a) || isNaN(b) || isNaN(c)) return null;

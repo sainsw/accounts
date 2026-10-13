@@ -10,6 +10,9 @@ export function usePersistentState<T>(key: string, initializer: () => T) {
     try {
       const stored = window.localStorage.getItem(key);
       if (stored) {
+        // localStorage only exists on the client, so it's read after mount;
+        // reading it during render would mismatch the server HTML.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setValue(JSON.parse(stored));
       }
     } catch {

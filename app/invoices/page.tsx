@@ -1,12 +1,12 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { Card, EmptyState, PageHeader, StatCard } from '@/components/Card';
 import { Button, Modal } from '@/components/Modal';
 import { cn, formatCurrency, formatDate, todayString, getYearRange, getFinancialYear } from '@/lib/utils';
-import type { TrackedInvoice, Transaction, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
+import type { Client, TrackedInvoice, Transaction, InvoiceWorkBlock, InvoiceExpense } from '@/lib/types';
 import { downloadInvoicePdf, getInvoicePdfAttachment } from '@/lib/invoice-pdf-adapter';
 import { computeInvoiceTotals, getWeekdays } from '@/lib/invoice-utils';
 import dynamic from 'next/dynamic';
@@ -62,6 +62,36 @@ export default function InvoicesPage() {
   );
 }
 
+// Prefill data passed from the standalone invoice generator as base64 JSON.
+function parseImportParam(raw: string, clients: Client[]): FormData | null {
+  try {
+    const data = JSON.parse(atob(raw));
+    const prefilled: FormData = {
+      invoiceNumber: data.invoiceNumber || '',
+      clientId: clients.find((c) => c.name === data.clientName)?.id ?? null,
+      clientName: data.clientName || '',
+      issueDate: data.issueDate || todayString(),
+      dueDate: data.dueDate || '',
+      amount: data.amount || 0,
+      status: data.status || 'sent',
+      paidDate: null,
+      notes: data.notes || '',
+      workBlocks: data.workBlocks || undefined,
+      expenses: data.expenses || undefined,
+      taxRate: data.taxRate ?? undefined,
+      purchaseOrder: data.purchaseOrder || undefined,
+    };
+    if (prefilled.workBlocks?.length || prefilled.expenses?.length) {
+      const totals = computeInvoiceTotals(prefilled.workBlocks || [], prefilled.expenses || [], prefilled.taxRate || 0);
+      prefilled.amount = totals.total;
+    }
+    return prefilled;
+  } catch {
+    // Invalid import data, ignore
+    return null;
+  }
+}
+
 function InvoicesContent() {
   const { ready, settings, invoices, clients, transactions, addInvoice, updateInvoice, deleteInvoice, addTransaction, deleteTransactionsByInvoiceId } = useApp();
   const [confirmDeleteInvoice, setConfirmDeleteInvoice] = useState<TrackedInvoice | null>(null);
@@ -73,55 +103,35 @@ function InvoicesContent() {
   const [importData, setImportData] = useState<FormData | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const importProcessed = useRef(false);
 
   const locale = settings.locale || 'en-US';
   const today = todayString();
   const currentFinYear = getFinancialYear(today, settings.taxYear);
   const currentYearRange = getYearRange(currentFinYear, settings.taxYear);
 
-  useEffect(() => {
-    if (!ready || importProcessed.current) return;
-    // Open a blank invoice form when arriving via the global "+ New" menu.
-    if (searchParams.get('new') === '1') {
-      importProcessed.current = true;
+  // Open the invoice form when arriving via the global "+ New" menu, or with
+  // ?import= data from the standalone invoice generator.
+  const newParam = searchParams.get('new') === '1';
+  const importParam = searchParams.get('import');
+  const pendingParam = !ready ? null : newParam ? 'new' : importParam ? `import:${importParam}` : null;
+  const [prevPendingParam, setPrevPendingParam] = useState<string | null>(null);
+  if (pendingParam !== prevPendingParam) {
+    setPrevPendingParam(pendingParam);
+    if (newParam) {
       setEditing(null);
       setModalOpen(true);
-      router.replace('/invoices');
-      return;
-    }
-    const raw = searchParams.get('import');
-    if (!raw) return;
-    importProcessed.current = true;
-    try {
-      const data = JSON.parse(atob(raw));
-      const prefilled: FormData = {
-        invoiceNumber: data.invoiceNumber || '',
-        clientId: clients.find((c) => c.name === data.clientName)?.id ?? null,
-        clientName: data.clientName || '',
-        issueDate: data.issueDate || todayString(),
-        dueDate: data.dueDate || '',
-        amount: data.amount || 0,
-        status: data.status || 'sent',
-        paidDate: null,
-        notes: data.notes || '',
-        workBlocks: data.workBlocks || undefined,
-        expenses: data.expenses || undefined,
-        taxRate: data.taxRate ?? undefined,
-        purchaseOrder: data.purchaseOrder || undefined,
-      };
-      if (prefilled.workBlocks?.length || prefilled.expenses?.length) {
-        const totals = computeInvoiceTotals(prefilled.workBlocks || [], prefilled.expenses || [], prefilled.taxRate || 0);
-        prefilled.amount = totals.total;
+    } else if (pendingParam && importParam) {
+      const prefilled = parseImportParam(importParam, clients);
+      if (prefilled) {
+        setImportData(prefilled);
+        setEditing(null);
+        setModalOpen(true);
       }
-      setImportData(prefilled);
-      setEditing(null);
-      setModalOpen(true);
-      router.replace('/invoices');
-    } catch {
-      // Invalid import data, ignore
     }
-  }, [ready, searchParams, clients, router]);
+  }
+  useEffect(() => {
+    if (pendingParam) router.replace('/invoices');
+  }, [pendingParam, router]);
 
   const filtered = useMemo(() => {
     let list = [...invoices].sort((a, b) => b.issueDate.localeCompare(a.issueDate));
@@ -599,7 +609,10 @@ function InvoiceModal({
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [autoDownloadPdf, setAutoDownloadPdf] = useState(true);
 
-  useMemo(() => {
+  // Reset the form whenever the modal opens or its source invoice changes.
+  const [synced, setSynced] = useState<{ open: boolean; editing: TrackedInvoice | null; importData: FormData | null } | null>(null);
+  if (synced?.open !== open || synced?.editing !== editing || synced?.importData !== importData) {
+    setSynced({ open, editing, importData });
     if (open) {
       if (importData) {
         setForm(importData);
@@ -628,7 +641,7 @@ function InvoiceModal({
         setItemized(true);
       }
     }
-  }, [open, editing, importData]);
+  }
 
   const set = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));

@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { createInvoice, createSettings, createTransaction, createClient } from '../test-helpers';
@@ -7,7 +8,7 @@ vi.mock('@/lib/context', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>,
+  default: ({ href, children, ...props }: ComponentProps<'a'>) => <a href={href} {...props}>{children}</a>,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -32,9 +33,9 @@ vi.mock('@/lib/invoice-utils', async (importOriginal) => ({
 }));
 
 vi.mock('next/dynamic', () => ({
-  default: (loader: () => Promise<any>) => {
+  default: (loader: () => Promise<unknown>) => {
     // Return a placeholder component for PdfImportWizard
-    const Component = (props: any) => <div data-testid="pdf-import-wizard">PDF Import Wizard</div>;
+    const Component = () => <div data-testid="pdf-import-wizard">PDF Import Wizard</div>;
     Component.displayName = 'DynamicComponent';
     return Component;
   },
@@ -42,6 +43,7 @@ vi.mock('next/dynamic', () => ({
 
 import InvoicesPage from '../../app/invoices/page';
 import { useApp } from '@/lib/context';
+import type { Transaction } from '@/lib/types';
 
 const baseInvoices = [
   createInvoice({ id: 'inv-1', invoiceNumber: 'INV-001', status: 'paid', amount: 1000, paidDate: '2024-06-15' }),
@@ -54,7 +56,7 @@ const baseContext = {
   ready: true,
   settings: createSettings({ taxYear: 'calendar' }),
   invoices: baseInvoices,
-  transactions: [] as any[],
+  transactions: [] as Transaction[],
   clients: [createClient({ id: 'c-1', name: 'Test Client' })],
   addInvoice: vi.fn(),
   updateInvoice: vi.fn(),
@@ -72,7 +74,7 @@ const baseContext = {
 };
 
 function setup(overrides: Partial<typeof baseContext> = {}) {
-  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as any);
+  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as unknown as ReturnType<typeof useApp>);
 }
 
 describe('InvoicesPage', () => {

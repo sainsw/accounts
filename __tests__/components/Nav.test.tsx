@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
@@ -8,7 +9,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) => (
+  default: ({ href, children, ...props }: ComponentProps<'a'>) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -38,7 +39,7 @@ describe('Nav', () => {
   it('does not render VAT link when vatRegistered is false', () => {
     vi.mocked(useApp).mockReturnValue({
       settings: { vatRegistered: false },
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
     render(<Nav />);
     expect(screen.queryByText('VAT')).not.toBeInTheDocument();
   });
@@ -46,7 +47,7 @@ describe('Nav', () => {
   it('renders VAT link when vatRegistered is true', () => {
     vi.mocked(useApp).mockReturnValue({
       settings: { vatRegistered: true },
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
     render(<Nav />);
     expect(screen.getByText('VAT')).toBeInTheDocument();
   });
@@ -55,7 +56,7 @@ describe('Nav', () => {
     mockPathname.mockReturnValue('/transactions');
     vi.mocked(useApp).mockReturnValue({
       settings: { vatRegistered: false },
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
     render(<Nav />);
     const txLink = screen.getByText('Money in & out').closest('a');
     expect(txLink!.className).toContain('bg-brand-50');
@@ -67,7 +68,7 @@ describe('Nav', () => {
   it('links navigate to correct paths', () => {
     vi.mocked(useApp).mockReturnValue({
       settings: { vatRegistered: true },
-    } as any);
+    } as unknown as ReturnType<typeof useApp>);
     mockPathname.mockReturnValue('/');
     render(<Nav />);
     expect(screen.getByText('Home').closest('a')).toHaveAttribute('href', '/');

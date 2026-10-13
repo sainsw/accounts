@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ParsedInvoice } from '../../lib/pdf-import';
 
@@ -33,7 +34,7 @@ function makeFile(name: string): File {
 }
 
 describe('PdfImportWizard', () => {
-  let onComplete: any;
+  let onComplete: Mock<ComponentProps<typeof PdfImportWizard>['onComplete']>;
 
   beforeEach(() => {
     onComplete = vi.fn();
@@ -44,7 +45,7 @@ describe('PdfImportWizard', () => {
   const defaultProps = {
     clients: [{ id: 'c-1', name: 'Acme Corp' }],
     existingInvoiceNumbers: [] as string[],
-    onComplete: vi.fn() as any,
+    onComplete: vi.fn(),
   };
 
   it('renders drop zone initially', () => {

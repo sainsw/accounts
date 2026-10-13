@@ -1,3 +1,11 @@
+import type {
+  Florence2ForConditionalGeneration,
+  Florence2Processor,
+  PreTrainedTokenizer,
+  ProgressInfo,
+  Tensor,
+} from '@huggingface/transformers';
+
 export type OcrResult = {
   totalAmount: number | null;
   date: string | null;
@@ -46,7 +54,11 @@ async function recognizeWithTesseract(
 
 const MODEL_ID = 'onnx-community/Florence-2-base-ft';
 
-type ModelBundle = { model: any; processor: any; tokenizer: any };
+type ModelBundle = {
+  model: Florence2ForConditionalGeneration;
+  processor: Florence2Processor;
+  tokenizer: PreTrainedTokenizer;
+};
 
 let cached: ModelBundle | null = null;
 let loading: Promise<ModelBundle> | null = null;
@@ -72,7 +84,7 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
           encoder_model: 'fp32',
           decoder_model_merged: 'q4',
         },
-        progress_callback: (p: any) => {
+        progress_callback: (p: ProgressInfo) => {
           if (p.status === 'progress' && typeof p.progress === 'number') {
             const pct = Math.round(p.progress);
             onProgress?.({ status: 'downloading', label: `Downloading vision model... ${pct}%` });
@@ -83,7 +95,11 @@ async function getModel(onProgress?: (p: OcrProgress) => void) {
       AutoTokenizer.from_pretrained(MODEL_ID),
     ]);
 
-    cached = { model, processor, tokenizer };
+    cached = {
+      model: model as Florence2ForConditionalGeneration,
+      processor: processor as Florence2Processor,
+      tokenizer,
+    };
     return cached;
   })();
 
@@ -117,7 +133,8 @@ async function recognizeWithFlorence(
 
   onProgress?.({ status: 'extracting', label: 'Extracting text...' });
 
-  const generatedText = tokenizer.batch_decode(generatedIds, {
+  // Without return_dict_in_generate, generate() returns the token ids.
+  const generatedText = tokenizer.batch_decode(generatedIds as Tensor, {
     skip_special_tokens: false,
   })[0];
 
@@ -127,7 +144,8 @@ async function recognizeWithFlorence(
     image.size,
   );
 
-  const text: string = result[task] ?? generatedText;
+  const parsed = result[task];
+  const text = typeof parsed === 'string' ? parsed : generatedText;
   return parseReceiptText(text);
 }
 

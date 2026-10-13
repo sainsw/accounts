@@ -30,8 +30,8 @@ async function extractLines(file: File): Promise<string[]> {
     const items: Array<{ str: string; transform: number[] }> = [];
     for (let idx = 0; idx < content.items.length; idx++) {
       const item = content.items[idx];
-      if (item && 'str' in item && typeof (item as any).str === 'string' && (item as any).str.trim().length > 0) {
-        items.push({ str: (item as any).str, transform: (item as any).transform });
+      if (item && 'str' in item && item.str.trim().length > 0) {
+        items.push({ str: item.str, transform: item.transform });
       }
     }
 

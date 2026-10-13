@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 const mockUpdateSettings = vi.fn();
@@ -35,7 +36,7 @@ vi.mock('@/lib/context', () => ({
 import SetupWizard from '../../components/SetupWizard';
 
 describe('SetupWizard', () => {
-  let onComplete: any;
+  let onComplete: Mock<ComponentProps<typeof SetupWizard>['onComplete']>;
 
   beforeEach(() => {
     onComplete = vi.fn();

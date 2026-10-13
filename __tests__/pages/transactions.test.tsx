@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { createTransaction, createClient, createSettings, createInvoice } from '../test-helpers';
@@ -7,7 +8,7 @@ vi.mock('@/lib/context', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>,
+  default: ({ href, children, ...props }: ComponentProps<'a'>) => <a href={href} {...props}>{children}</a>,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -34,6 +35,7 @@ vi.mock('@/lib/undo-context', () => ({
 
 import TransactionsPage from '../../app/transactions/page';
 import { useApp } from '@/lib/context';
+import type { TrackedInvoice } from '@/lib/types';
 
 const baseTx = [
   createTransaction({ id: 'tx-1', description: 'Client A Work', category: 'Consulting', type: 'income', amount: 5000, date: '2024-06-01' }),
@@ -46,7 +48,7 @@ const baseContext = {
   settings: createSettings(),
   transactions: baseTx,
   clients: [createClient({ id: 'c-1', name: 'Client A' })],
-  invoices: [] as any[],
+  invoices: [] as TrackedInvoice[],
   addTransaction: vi.fn(),
   updateTransaction: vi.fn(),
   deleteTransaction: vi.fn(),
@@ -63,7 +65,7 @@ const baseContext = {
 };
 
 function setup(overrides: Partial<typeof baseContext> = {}) {
-  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as any);
+  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as unknown as ReturnType<typeof useApp>);
 }
 
 describe('TransactionsPage', () => {

@@ -110,7 +110,7 @@ describe('parseInvoicePdf', () => {
         'Bill To',
         'Acme Corp',
         'Grand total  £6124.00',
-      ]) as any
+      ]) as unknown as ReturnType<typeof getDocument>
     );
 
     const file = makeFile('invoice-42.pdf');
@@ -125,7 +125,7 @@ describe('parseInvoicePdf', () => {
 
   it('returns low confidence when no fields extracted', async () => {
     vi.mocked(getDocument).mockReturnValue(
-      makePdfMock(['Some random text', 'with no invoice data']) as any
+      makePdfMock(['Some random text', 'with no invoice data']) as unknown as ReturnType<typeof getDocument>
     );
 
     const file = makeFile('INV-007.pdf');
@@ -137,7 +137,7 @@ describe('parseInvoicePdf', () => {
 
   it('falls back to filename for invoice number when PDF has no invoice number', async () => {
     vi.mocked(getDocument).mockReturnValue(
-      makePdfMock(['No invoice number here']) as any
+      makePdfMock(['No invoice number here']) as unknown as ReturnType<typeof getDocument>
     );
 
     const file = makeFile('INV-099.pdf');
@@ -149,7 +149,7 @@ describe('parseInvoicePdf', () => {
   it('falls back to filename when extraction fails', async () => {
     vi.mocked(getDocument).mockReturnValue({
       promise: Promise.reject(new Error('PDF load error')),
-    } as any);
+    } as unknown as ReturnType<typeof getDocument>);
 
     const file = makeFile('INV-123.pdf');
     const result = await parseInvoicePdf(file);
@@ -166,7 +166,7 @@ describe('parseInvoicePdfs', () => {
 
   it('processes multiple files in parallel', async () => {
     vi.mocked(getDocument).mockReturnValue(
-      makePdfMock(['No invoice data']) as any
+      makePdfMock(['No invoice data']) as unknown as ReturnType<typeof getDocument>
     );
 
     const files = [makeFile('INV-001.pdf'), makeFile('INV-002.pdf'), makeFile('INV-003.pdf')];

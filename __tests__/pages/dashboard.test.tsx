@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { createTransaction, createInvoice, createSettings } from '../test-helpers';
@@ -7,17 +8,18 @@ vi.mock('@/lib/context', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a>,
+  default: ({ href, children, ...props }: ComponentProps<'a'>) => <a href={href} {...props}>{children}</a>,
 }));
 
 import Dashboard from '../../app/page';
 import { useApp } from '@/lib/context';
+import type { TrackedInvoice, Transaction } from '@/lib/types';
 
 const baseContext = {
   ready: true,
   settings: createSettings({ currencySymbol: '$', taxYear: 'calendar', taxMode: 'flat', taxRate: 20, locale: 'en-US' }),
-  transactions: [] as any[],
-  invoices: [] as any[],
+  transactions: [] as Transaction[],
+  invoices: [] as TrackedInvoice[],
   updateSettings: vi.fn(),
   onboardingDone: true,
   completeOnboarding: vi.fn(),
@@ -35,7 +37,7 @@ const baseContext = {
 };
 
 function setup(overrides: Partial<typeof baseContext> = {}) {
-  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as any);
+  vi.mocked(useApp).mockReturnValue({ ...baseContext, ...overrides } as unknown as ReturnType<typeof useApp>);
 }
 
 describe('Dashboard', () => {
