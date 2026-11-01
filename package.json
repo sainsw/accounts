@@ -6,9 +6,10 @@
     "dev": "next dev",
     "build": "NODE_ENV=test vitest run && next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "biome lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint:fix": "biome check --write"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -23,6 +24,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -30,19 +32,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
-    "eslint": "^9",
-    "eslint-config-next": "^16.4.0",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.12"
-  },
-  "overrides": {
-    "@next/eslint-plugin-next": {
-      "fast-glob": "npm:tinyglobby@^0.2.17"
-    },
-    "@typescript-eslint/typescript-estree": {
-      "minimatch": "^11.0.1"
-    }
   }
 }

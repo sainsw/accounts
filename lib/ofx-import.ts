@@ -10,8 +10,7 @@ export function parseOFX(content: string): ParsedBankEntry[] {
   const entries: ParsedBankEntry[] = [];
   const txnRegex = /<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi;
 
-  let match: RegExpExecArray | null;
-  while ((match = txnRegex.exec(content)) !== null) {
+  for (const match of content.matchAll(txnRegex)) {
     try {
       const block = match[1];
       const dateRaw = extractTag(block, "DTPOSTED");

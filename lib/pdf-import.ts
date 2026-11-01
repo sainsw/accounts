@@ -160,7 +160,9 @@ export async function parseInvoicePdf(file: File): Promise<ParsedInvoice> {
   }
 
   console.log(`[pdf-import] ${file.name} — ${lines.length} lines extracted:`);
-  lines.forEach((l, i) => console.log(`  [${i}] ${l}`));
+  lines.forEach((l, i) => {
+    console.log(`  [${i}] ${l}`);
+  });
 
   if (lines.length === 0) {
     result.invoiceNumber = invoiceNumberFromFilename(file.name);

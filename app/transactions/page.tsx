@@ -234,7 +234,9 @@ function TransactionsContent() {
           <button
             onClick={() => {
               if (confirm(`Delete ${selected.size} transaction(s)?`)) {
-                selected.forEach((id) => deleteTransaction(id));
+                selected.forEach((id) => {
+                  deleteTransaction(id);
+                });
                 setSelected(new Set());
               }
             }}

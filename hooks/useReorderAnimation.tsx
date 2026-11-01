@@ -26,7 +26,9 @@ export const useReorderAnimation = () => {
         if (!el || typeof el.animate !== 'function') return;
         el.getAnimations?.()
           .filter((a) => (a.effect as KeyframeEffect | null)?.getKeyframes().some((k) => 'transform' in k))
-          .forEach((a) => a.cancel());
+          .forEach((a) => {
+            a.cancel();
+          });
         el.animate(
           [
             { transform: `translate3d(0, ${dy}px, 0)` },
