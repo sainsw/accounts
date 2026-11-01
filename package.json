@@ -16,7 +16,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@huggingface/transformers": "^4.2.0",
     "@sainsw/invoice-pdf": "^1.2.0",
-    "next": "^16.4.0",
+    "next": "^16.4.3",
     "pdfjs-dist": "^4.10.38",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -35,7 +35,7 @@
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "@next/eslint-plugin-next": {
